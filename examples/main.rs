@@ -1,7 +1,9 @@
-use minecrust::stream::ReadExtension;
+use std::io::{Read, Write};
 use std::net::TcpListener;
-use minecrust::packets::{Handshake, StatusRequest, ServerDescription, PingRequest};
-use std::io::Write;
+
+use minecrust::error::Result;
+use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
+use minecrust::stream::ReadExtension;
 
 fn main() {
     let mut buffer = std::io::Cursor::new(vec![0xDE, 0xAD]);
@@ -22,15 +24,46 @@ fn main() {
             let handshake = Handshake::parse(&mut stream).unwrap();
             println!("{:?}", handshake);
 
-            let status_request = StatusRequest::parse(&mut stream).unwrap();
-            status_request.answer(&mut stream, server_description).unwrap();
-            stream.flush().unwrap();
-
-            println!("Status sent.");
-
-            let ping_request = PingRequest::parse(&mut stream).unwrap();
-            ping_request.answer(&mut stream).unwrap();
-            stream.flush().unwrap();
+            match *handshake.next_state {
+                1 => handle_status(&mut stream, server_description),
+                2 => {
+                    handle_login(&mut stream).unwrap();
+                    handle_play(&mut stream)
+                }
+                _ => panic!("impossible"),
+            }
+            .unwrap();
         });
     }
+}
+
+fn handle_status(
+    stream: &mut (impl Read + Write),
+    server_description: &ServerDescription,
+) -> Result<()> {
+    let status_request = StatusRequest::parse(stream)?;
+    status_request.answer(stream, server_description)?;
+    stream.flush()?;
+    println!("Status sent.");
+
+    let ping_request = PingRequest::parse(stream)?;
+    ping_request.answer(stream)?;
+    stream.flush()?;
+    println!("Pong sent.");
+    Ok(())
+}
+
+fn handle_login(stream: &mut (impl Read + Write)) -> Result<()> {
+    let login_start = LoginRequest::parse(stream)?;
+    login_start.answer(stream)?;
+    stream.flush()?;
+    println!("{:?}", login_start);
+    Ok(())
+}
+
+fn handle_play(stream: &mut (impl Read + Write)) -> Result<()> {
+    stream
+        .bytes()
+        .for_each(|b| print!("{:02x} ", b.unwrap_or(0x00)));
+    Ok(())
 }

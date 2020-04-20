@@ -1,29 +1,31 @@
 use std::io::Read;
 
-use crate::types;
 use crate::error::Result;
 use crate::stream::ReadExtension;
+use crate::types;
 
 #[derive(Debug)]
 pub struct Handshake {
     pub protocol_version: types::VarInt,
     pub server_address: types::String,
     pub server_port: u16,
-    pub next_state: types::VarInt
+    pub next_state: types::VarInt,
 }
 
 impl Handshake {
+    const PACKET_ID: types::VarInt = types::VarInt(0x00);
+
     pub fn new(
         protocol_version: types::VarInt,
         server_address: types::String,
         server_port: u16,
-        next_state: types::VarInt
+        next_state: types::VarInt,
     ) -> Self {
         Self {
             protocol_version,
             server_address,
             server_port,
-            next_state
+            next_state,
         }
     }
 
@@ -32,7 +34,7 @@ impl Handshake {
         let mut reader = reader.take(*size as u64);
 
         let id = reader.read_var_int()?;
-        if *id != 0x00 {
+        if *id != *Self::PACKET_ID {
             return Err("unexpected non handshake packet id".into());
         }
 
@@ -40,7 +42,7 @@ impl Handshake {
             reader.read_var_int()?,
             reader.read_string()?,
             reader.read_u16()?,
-            reader.read_var_int()?
+            reader.read_var_int()?,
         );
 
         if !(1..=2).contains(&*handshake.next_state) {

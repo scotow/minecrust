@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
-use crate::types::*;
 use crate::error::Result;
+use crate::types::*;
 
 pub trait ReadExtension: Read + Sized {
     fn read_u8(&mut self) -> Result<u8> {
@@ -71,8 +71,8 @@ impl<W: Write> WriteExtension for W {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
     use crate::stream::ReadExtension;
+    use std::io::Cursor;
 
     #[test]
     fn read_u8() -> Result<()> {

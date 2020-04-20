@@ -1,8 +1,8 @@
 use std::io::{Read, Write};
 
-use crate::stream::{ReadExtension, WriteExtension};
 use crate::error::*;
-use std::ops::{Deref, Add};
+use crate::stream::{ReadExtension, WriteExtension};
+use std::ops::{Add, Deref};
 
 #[derive(Debug, Copy, Clone)]
 pub struct VarInt(pub i32);
@@ -14,9 +14,7 @@ impl VarInt {
         Self(n)
     }
 
-    pub fn parse<R: Read>(
-        reader: &mut R,
-    ) -> Result<Self> {
+    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
         let mut read_int: i32 = 0;
         let mut bytes_read: i32 = 0;
         loop {
@@ -47,13 +45,11 @@ impl VarInt {
     }
 
     pub fn size(&self) -> VarInt {
-        Self::new(
-            match self.0 {
-                std::i32::MIN..=-1 => Self::MAX_SIZE,
-                0 => 1,
-                1..=std::i32::MAX => ((self.0 as f64).log2() as i32) / 7 + 1
-            }
-        )
+        Self::new(match self.0 {
+            std::i32::MIN..=-1 => Self::MAX_SIZE,
+            0 => 1,
+            1..=std::i32::MAX => ((self.0 as f64).log2() as i32) / 7 + 1,
+        })
     }
 }
 
@@ -84,8 +80,14 @@ mod tests {
         for i in 0..=((1 << 7) - 1) {
             assert_eq!(*VarInt::new(i).size(), 1);
         }
-        assert_eq!(*VarInt::new(0b0000_0000__0010_0000__0000_0000__0000_0000).size(), 4);
-        assert_eq!(*VarInt::new(0b0000_0000__0001_0000__0000_0000__0000_0000).size(), 3);
+        assert_eq!(
+            *VarInt::new(0b0000_0000__0010_0000__0000_0000__0000_0000).size(),
+            4
+        );
+        assert_eq!(
+            *VarInt::new(0b0000_0000__0001_0000__0000_0000__0000_0000).size(),
+            3
+        );
         assert_eq!(*VarInt::new(std::i32::MAX).size(), VarInt::MAX_SIZE);
     }
 }

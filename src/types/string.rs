@@ -1,9 +1,9 @@
 use std::io::{Read, Write};
-use std::ops::{Deref};
+use std::ops::Deref;
 use std::string::String as StdString;
 
-use crate::stream::{ReadExtension, WriteExtension};
 use crate::error::*;
+use crate::stream::{ReadExtension, WriteExtension};
 use crate::types;
 
 #[derive(Debug, Clone)]
