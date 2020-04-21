@@ -76,32 +76,33 @@ impl<W: AsyncWrite + Unpin> WriteExtension for W {}
 mod tests {
     use super::*;
     use crate::stream::ReadExtension;
-    use std::io::Cursor;
+    use futures::io::Cursor;
+    use futures_await_test::async_test;
 
-    #[test]
-    fn read_u8() -> Result<()> {
+    #[async_test]
+    async fn read_u8() -> Result<()> {
         let mut buffer = Cursor::new(vec![0xDE, 0xAD]);
-        assert_eq!(buffer.read_u8()?, 0xDE);
-        assert_eq!(buffer.read_u8()?, 0xAD);
-        assert!(buffer.read_u8().is_err());
+        assert_eq!(buffer.read_u8().await?, 0xDE);
+        assert_eq!(buffer.read_u8().await?, 0xAD);
+        assert!(buffer.read_u8().await.is_err());
         Ok(())
     }
 
-    #[test]
-    fn read_u16() -> Result<()> {
+    #[async_test]
+    async fn read_u16() -> Result<()> {
         let mut buffer = Cursor::new(vec![0xDE, 0xAD, 0xBE, 0xEF, 0x42]);
-        assert_eq!(buffer.read_u16()?, 0xDEAD);
-        assert_eq!(buffer.read_u16()?, 0xBEEF);
-        assert!(buffer.read_u16().is_err());
+        assert_eq!(buffer.read_u16().await?, 0xDEAD);
+        assert_eq!(buffer.read_u16().await?, 0xBEEF);
+        assert!(buffer.read_u16().await.is_err());
         Ok(())
     }
 
-    #[test]
-    fn read_i8() -> Result<()> {
+    #[async_test]
+    async fn read_i8() -> Result<()> {
         let mut buffer = Cursor::new(vec![0xFF, 0x7F]);
-        assert_eq!(buffer.read_i8()?, -1);
-        assert_eq!(buffer.read_i8()?, 127);
-        assert!(buffer.read_i8().is_err());
+        assert_eq!(buffer.read_i8().await?, -1);
+        assert_eq!(buffer.read_i8().await?, 127);
+        assert!(buffer.read_i8().await.is_err());
         Ok(())
     }
 }
