@@ -1,69 +1,78 @@
-use std::io::{Read, Write};
+use futures::prelude::*;
+use std::marker::Unpin;
 use std::net::TcpListener;
 
-use minecrust::error::Result;
+use smol::{Async, Task};
+
+use anyhow::Result;
 use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
 use minecrust::stream::ReadExtension;
 
 fn main() {
-    let mut buffer = std::io::Cursor::new(vec![0xDE, 0xAD]);
-    assert_eq!(buffer.read_u8().unwrap(), 0xDE);
-
     let mut server_description: ServerDescription = Default::default();
     server_description.players = (3, 42);
     server_description.description = "Rusty Minecraft Server".to_string();
     server_description.icon = std::fs::read("./examples/assets/server-icon.png").ok();
 
     let server_description: &'static ServerDescription = Box::leak(Box::new(server_description));
-
-    let listener = TcpListener::bind("127.0.0.1:25565").unwrap();
-    for stream in listener.incoming() {
-        std::thread::spawn(move || {
+    let listener = Async::<TcpListener>::bind("127.0.0.1:25565").unwrap();
+    let mut incoming = listener.incoming();
+    smol::run(async {
+        while let Some(stream) = incoming.next().await {
             let mut stream = stream.unwrap();
-
-            let handshake = Handshake::parse(&mut stream).unwrap();
-            println!("{:?}", handshake);
-
-            match *handshake.next_state {
-                1 => handle_status(&mut stream, server_description),
-                2 => {
-                    handle_login(&mut stream).unwrap();
-                    handle_play(&mut stream)
-                }
-                _ => panic!("impossible"),
-            }
-            .unwrap();
-        });
-    }
+            Task::spawn(handle_connexion(stream, server_description))
+                .unwrap()
+                .detach();
+        }
+    });
 }
 
-fn handle_status(
-    stream: &mut (impl Read + Write),
+async fn handle_connexion(
+    mut stream: (impl AsyncRead + AsyncWrite + Unpin + Send),
     server_description: &ServerDescription,
 ) -> Result<()> {
-    let status_request = StatusRequest::parse(stream)?;
-    status_request.answer(stream, server_description)?;
-    stream.flush()?;
+    let handshake = Handshake::parse(&mut stream).await.unwrap();
+    println!("{:?}", handshake);
+
+    match *handshake.next_state {
+        1 => handle_status(&mut stream, server_description).await,
+        2 => {
+            handle_login(&mut stream).await.unwrap();
+            handle_play(&mut stream).await
+        }
+        _ => panic!("impossible"),
+    }
+    .unwrap();
+    Ok(())
+}
+
+async fn handle_status(
+    stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send),
+    server_description: &ServerDescription,
+) -> Result<()> {
+    let status_request = StatusRequest::parse(stream).await?;
+    status_request.answer(stream, server_description).await?;
+    stream.flush().await?;
     println!("Status sent.");
 
-    let ping_request = PingRequest::parse(stream)?;
-    ping_request.answer(stream)?;
-    stream.flush()?;
+    let ping_request = PingRequest::parse(stream).await?;
+    ping_request.answer(stream).await?;
+    stream.flush().await?;
     println!("Pong sent.");
     Ok(())
 }
 
-fn handle_login(stream: &mut (impl Read + Write)) -> Result<()> {
-    let login_start = LoginRequest::parse(stream)?;
-    login_start.answer(stream)?;
-    stream.flush()?;
+async fn handle_login(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send)) -> Result<()> {
+    let login_start = LoginRequest::parse(stream).await?;
+    login_start.answer(stream).await?;
+    stream.flush().await?;
     println!("{:?}", login_start);
     Ok(())
 }
 
-fn handle_play(stream: &mut (impl Read + Write)) -> Result<()> {
-    stream
-        .bytes()
-        .for_each(|b| print!("{:02x} ", b.unwrap_or(0x00)));
+async fn handle_play(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send)) -> Result<()> {
+    let mut buf = Vec::new();
+    stream.read_to_end(&mut buf).await;
+    dbg!(buf);
     Ok(())
 }
