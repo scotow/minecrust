@@ -1,7 +1,8 @@
-use std::io::{Read, Write};
+use futures::prelude::*;
 
 use crate::error::*;
 use crate::stream::{ReadExtension, WriteExtension};
+use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
 #[derive(Debug, Copy, Clone)]
@@ -14,11 +15,11 @@ impl VarInt {
         Self(n)
     }
 
-    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
+    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
         let mut read_int: i32 = 0;
         let mut bytes_read: i32 = 0;
         loop {
-            let incoming_byte = reader.read_u8()?;
+            let incoming_byte = reader.read_u8().await?;
             read_int |= ((incoming_byte & 0b0111_1111) as i32) << 7 * bytes_read;
             bytes_read += 1;
             if incoming_byte >> 7 == 0 {
@@ -29,16 +30,16 @@ impl VarInt {
         }
     }
 
-    pub fn write<W: Write>(&self, writer: &mut W) -> Result<()> {
+    pub async fn write<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W) -> Result<()> {
         let mut n = self.0 as u32;
         loop {
             let tmp = n as u8 & 0b0111_1111;
             n >>= 7;
             if n == 0 {
-                writer.write_u8(tmp)?;
+                writer.write_u8(tmp).await?;
                 break;
             } else {
-                writer.write_u8(tmp | 0b1000_0000)?;
+                writer.write_u8(tmp | 0b1000_0000).await?;
             }
         }
         Ok(())

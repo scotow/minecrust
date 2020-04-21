@@ -1,4 +1,5 @@
-use std::io::{Read, Write};
+use futures::prelude::*;
+use std::marker::Unpin;
 use std::ops::Deref;
 use std::string::String as StdString;
 
@@ -14,10 +15,13 @@ impl String {
         Self(s.to_string())
     }
 
-    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
+    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
         let mut result = StdString::new();
-        let size = reader.read_var_int()?;
-        let read = reader.take(*size as u64).read_to_string(&mut result)?;
+        let size = reader.read_var_int().await?;
+        let read = reader
+            .take(*size as u64)
+            .read_to_string(&mut result)
+            .await?;
         if *size as usize != read {
             Err("invalid string size".into())
         } else {
@@ -25,9 +29,11 @@ impl String {
         }
     }
 
-    pub fn write<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_var_int(types::VarInt::new(self.0.len() as i32))?;
-        writer.write_all(self.0.as_bytes())?;
+    pub async fn write<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W) -> Result<()> {
+        writer
+            .write_var_int(types::VarInt::new(self.0.len() as i32))
+            .await?;
+        writer.write_all(self.0.as_bytes()).await?;
         Ok(())
     }
 

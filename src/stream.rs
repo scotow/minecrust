@@ -1,72 +1,76 @@
-use std::io::{Read, Write};
+use async_trait::async_trait;
+use futures::prelude::*;
+use std::marker::Unpin;
 
 use crate::error::Result;
 use crate::types::*;
 
-pub trait ReadExtension: Read + Sized {
-    fn read_u8(&mut self) -> Result<u8> {
+#[async_trait]
+pub trait ReadExtension: AsyncRead + Unpin + Sized {
+    async fn read_u8(&mut self) -> Result<u8> {
         let mut buff = [0; 1];
-        self.read_exact(&mut buff)?;
+        self.read_exact(&mut buff).await?;
         Ok(buff[0])
     }
 
-    fn read_u16(&mut self) -> Result<u16> {
+    async fn read_u16(&mut self) -> Result<u16> {
         let mut buff = [0; 2];
-        self.read_exact(&mut buff)?;
+        self.read_exact(&mut buff).await?;
         Ok(((buff[0] as u16) << 8) | buff[1] as u16)
     }
 
-    fn read_u64(&mut self) -> Result<u64> {
+    async fn read_u64(&mut self) -> Result<u64> {
         let mut buff = [0; 8];
-        self.read_exact(&mut buff)?;
+        self.read_exact(&mut buff).await?;
         Ok(u64::from_be_bytes(buff))
     }
 
-    fn read_i8(&mut self) -> Result<i8> {
-        self.read_u8().map(|n| n as i8)
+    async fn read_i8(&mut self) -> Result<i8> {
+        self.read_u8().await.map(|n| n as i8)
     }
 
-    fn read_i16(&mut self) -> Result<i16> {
-        self.read_u16().map(|n| n as i16)
+    async fn read_i16(&mut self) -> Result<i16> {
+        self.read_u16().await.map(|n| n as i16)
     }
 
-    fn read_i64(&mut self) -> Result<i64> {
-        self.read_u64().map(|n| n as i64)
+    async fn read_i64(&mut self) -> Result<i64> {
+        self.read_u64().await.map(|n| n as i64)
     }
 
-    fn read_var_int(&mut self) -> Result<VarInt> {
-        VarInt::parse(self)
+    async fn read_var_int(&mut self) -> Result<VarInt> {
+        VarInt::parse(self).await
     }
 
-    fn read_string(&mut self) -> Result<String> {
-        String::parse(self)
+    async fn read_string(&mut self) -> Result<String> {
+        String::parse(self).await
     }
 }
 
-impl<R: Read> ReadExtension for R {}
+impl<R: AsyncRead + Unpin> ReadExtension for R {}
 
-pub trait WriteExtension: Write + Sized {
-    fn write_u8(&mut self, n: u8) -> Result<()> {
+#[async_trait]
+pub trait WriteExtension: AsyncWrite + Unpin + Sized {
+    async fn write_u8(&mut self, n: u8) -> Result<()> {
         let buff = [n; 1];
-        self.write_all(&buff)?;
+        self.write_all(&buff).await?;
         Ok(())
     }
 
-    fn write_i64(&mut self, n: i64) -> Result<()> {
-        self.write_all(&n.to_be_bytes())?;
+    async fn write_i64(&mut self, n: i64) -> Result<()> {
+        self.write_all(&n.to_be_bytes()).await?;
         Ok(())
     }
 
-    fn write_var_int(&mut self, n: VarInt) -> Result<()> {
-        n.write(self)
+    async fn write_var_int(&mut self, n: VarInt) -> Result<()> {
+        n.write(self).await
     }
 
-    fn write_string(&mut self, s: &String) -> Result<()> {
-        s.write(self)
+    async fn write_string(&mut self, s: &String) -> Result<()> {
+        s.write(self).await
     }
 }
 
-impl<W: Write> WriteExtension for W {}
+impl<W: AsyncWrite + Unpin> WriteExtension for W {}
 
 #[cfg(test)]
 mod tests {
