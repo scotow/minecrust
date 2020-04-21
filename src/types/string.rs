@@ -3,9 +3,9 @@ use std::marker::Unpin;
 use std::ops::Deref;
 use std::string::String as StdString;
 
-use crate::error::*;
 use crate::stream::{ReadExtension, WriteExtension};
 use crate::types;
+use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone)]
 pub struct String(StdString);
@@ -23,7 +23,7 @@ impl String {
             .read_to_string(&mut result)
             .await?;
         if *size as usize != read {
-            Err("invalid string size".into())
+            Err(anyhow!("invalid string size"))
         } else {
             Ok(Self::new(&result))
         }

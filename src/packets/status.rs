@@ -1,9 +1,9 @@
 use futures::prelude::*;
 use std::marker::Unpin;
 
-use crate::error::Result;
 use crate::stream::{ReadExtension, WriteExtension};
 use crate::types;
+use anyhow::{anyhow, Result};
 
 use serde::Serialize;
 use serde_json::json;
@@ -16,12 +16,12 @@ impl StatusRequest {
     pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
         if *size != 1 {
-            return Err("invalid packet size".into());
+            return Err(anyhow!("invalid packet size"));
         }
 
         let id = reader.read_var_int().await?;
         if *id != *Self::PACKET_ID {
-            return Err("unexpected non request packet id".into());
+            return Err(anyhow!("unexpected non request packet id"));
         }
 
         Ok(Self {})
@@ -98,12 +98,12 @@ impl PingRequest {
     pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
         if *size != *Self::PACKET_ID.size() + 8 {
-            return Err("invalid packet size".into());
+            return Err(anyhow!("invalid packet size"));
         }
 
         let id = reader.read_var_int().await?;
         if *id != *Self::PACKET_ID {
-            return Err("unexpected non ping packet id".into());
+            return Err(anyhow!("unexpected non ping packet id"));
         }
 
         Ok(Self {

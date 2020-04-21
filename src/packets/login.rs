@@ -1,8 +1,8 @@
 use futures::prelude::*;
 
-use crate::error::Result;
 use crate::stream::{ReadExtension, WriteExtension};
 use crate::types;
+use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 
 #[derive(Debug)]
@@ -20,12 +20,12 @@ impl LoginRequest {
     pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
         if *size > *Self::START_MAX_SIZE {
-            return Err("invalid packet size".into());
+            return Err(anyhow!("invalid packet size"));
         }
 
         let id = reader.read_var_int().await?;
         if *id != *Self::START_PACKET_ID {
-            return Err("unexpected non login packet id".into());
+            return Err(anyhow!("unexpected non login packet id"));
         }
 
         Ok(Self {

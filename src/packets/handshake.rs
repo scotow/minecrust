@@ -1,9 +1,9 @@
 use futures::prelude::*;
 use std::marker::Unpin;
 
-use crate::error::Result;
 use crate::stream::ReadExtension;
 use crate::types;
+use anyhow::{anyhow, Result};
 
 #[derive(Debug)]
 pub struct Handshake {
@@ -36,7 +36,7 @@ impl Handshake {
 
         let id = reader.read_var_int().await?;
         if *id != *Self::PACKET_ID {
-            return Err("unexpected non handshake packet id".into());
+            return Err(anyhow!("unexpected non handshake packet id"));
         }
 
         let handshake = Self::new(
@@ -47,7 +47,7 @@ impl Handshake {
         );
 
         if !(1..=2).contains(&*handshake.next_state) {
-            return Err("invalid next state packet id".into());
+            return Err(anyhow!("invalid next state packet id"));
         }
 
         Ok(handshake)

@@ -1,7 +1,7 @@
 use futures::prelude::*;
 
-use crate::error::*;
 use crate::stream::{ReadExtension, WriteExtension};
+use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
@@ -25,7 +25,7 @@ impl VarInt {
             if incoming_byte >> 7 == 0 {
                 return Ok(Self::new(read_int));
             } else if bytes_read == Self::MAX_SIZE {
-                return Err("VarInt bigger than 5 bytes sent".into());
+                return Err(anyhow!("VarInt bigger than 5 bytes sent"));
             }
         }
     }

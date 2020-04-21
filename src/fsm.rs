@@ -1,5 +1,5 @@
 use crate::types;
-use minecrust::error::Result;
+use anyhow::Result;
 use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
 use std::io::{Read, Write};
 

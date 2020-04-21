@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use futures::prelude::*;
 use std::marker::Unpin;
 
-use crate::error::Result;
 use crate::types::*;
+use anyhow::Result;
 
 #[async_trait]
 pub trait ReadExtension: AsyncRead + Unpin + Sized {
