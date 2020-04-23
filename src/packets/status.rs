@@ -2,7 +2,7 @@ use futures::prelude::*;
 use std::marker::Unpin;
 
 use crate::stream::{ReadExtension, WriteExtension};
-use crate::types;
+use crate::types::{self, Size};
 use anyhow::{anyhow, Result};
 
 use serde::Serialize;

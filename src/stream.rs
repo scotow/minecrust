@@ -56,8 +56,23 @@ pub trait WriteExtension: AsyncWrite + Unpin + Sized {
         Ok(())
     }
 
+    async fn write_i8(&mut self, n: i8) -> Result<()> {
+        self.write_u8(n as u8).await?;
+        Ok(())
+    }
+
+    async fn write_i32(&mut self, n: i32) -> Result<()> {
+        self.write_all(&n.to_be_bytes()).await?;
+        Ok(())
+    }
+
     async fn write_i64(&mut self, n: i64) -> Result<()> {
         self.write_all(&n.to_be_bytes()).await?;
+        Ok(())
+    }
+
+    async fn write_bool(&mut self, b: bool) -> Result<()> {
+        self.write_u8(b.into()).await?;
         Ok(())
     }
 

@@ -1,7 +1,7 @@
 use futures::prelude::*;
 
 use crate::stream::{ReadExtension, WriteExtension};
-use crate::types;
+use crate::types::{self, Size};
 use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 

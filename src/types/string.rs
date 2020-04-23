@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::string::String as StdString;
 
 use crate::stream::{ReadExtension, WriteExtension};
-use crate::types;
+use crate::types::{self, Size};
 use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone)]
@@ -36,8 +36,10 @@ impl String {
         writer.write_all(self.0.as_bytes()).await?;
         Ok(())
     }
+}
 
-    pub fn size(&self) -> types::VarInt {
+impl Size for String {
+    fn size(&self) -> types::VarInt {
         types::VarInt::new(self.0.len() as i32).size() + types::VarInt::new(self.0.len() as i32)
     }
 }

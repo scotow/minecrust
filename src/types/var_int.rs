@@ -1,11 +1,13 @@
-use futures::prelude::*;
-
-use crate::stream::{ReadExtension, WriteExtension};
-use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
-#[derive(Debug, Copy, Clone)]
+use crate::types::{self, Size};
+use crate::stream::{ReadExtension, WriteExtension};
+
+use futures::prelude::*;
+use anyhow::{anyhow, Result};
+
+#[derive(Debug, Copy, Clone, Default)]
 pub struct VarInt(pub i32);
 
 impl VarInt {
@@ -44,8 +46,10 @@ impl VarInt {
         }
         Ok(())
     }
+}
 
-    pub fn size(&self) -> VarInt {
+impl Size for VarInt {
+    fn size(&self) -> VarInt {
         Self::new(match self.0 {
             std::i32::MIN..=-1 => Self::MAX_SIZE,
             0 => 1,

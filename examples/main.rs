@@ -1,14 +1,25 @@
+#![allow(unused_must_use, unused_imports)]
+
 use futures::prelude::*;
 use std::marker::Unpin;
 use std::net::TcpListener;
 
 use smol::{Async, Task};
-
 use anyhow::Result;
+
 use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
 use minecrust::stream::ReadExtension;
+use minecrust::types::{self, Size};
+use minecrust::packets::play::join_game::JoinGame;
 
 fn main() {
+    let it = minecrust::packets::play::LeaveGame {
+        id: 0,
+        foo: types::VarInt::new(300),
+        name: types::String::new("hello, world!"),
+    };
+    // dbg!(it.size());
+
     let mut server_description: ServerDescription = Default::default();
     server_description.players = (3, 42);
     server_description.description = "Rusty Minecraft Server".to_string();
@@ -19,7 +30,7 @@ fn main() {
     let mut incoming = listener.incoming();
     smol::run(async {
         while let Some(stream) = incoming.next().await {
-            let mut stream = stream.unwrap();
+            let stream = stream.unwrap();
             Task::spawn(handle_connexion(stream, server_description))
                 .unwrap()
                 .detach();
@@ -40,7 +51,7 @@ async fn handle_connexion(
             handle_login(&mut stream).await.unwrap();
             handle_play(&mut stream).await
         }
-        _ => panic!("impossible"),
+        _ => unreachable!(),
     }
     .unwrap();
     Ok(())
@@ -71,6 +82,10 @@ async fn handle_login(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send))
 }
 
 async fn handle_play(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send)) -> Result<()> {
+    let join_game = JoinGame::default();
+    join_game.send(stream).await?;
+    stream.flush().await?;
+
     let mut buf = Vec::new();
     stream.read_to_end(&mut buf).await;
     dbg!(buf);
