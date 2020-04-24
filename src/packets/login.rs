@@ -1,7 +1,7 @@
 use futures::prelude::*;
 
-use crate::stream::{ReadExtension, WriteExtension};
-use crate::types::{self, Size};
+use crate::stream::{ReadExtension};
+use crate::types::{self, Size, Send};
 use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 
@@ -17,7 +17,7 @@ impl LoginRequest {
     const SUCCESS_PACKET_ID: types::VarInt = types::VarInt(0x02);
     const RANDOM_UUID: &'static str = "cbc2619b-9c6b-4171-a51d-abc281d6ff38";
 
-    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
         if *size > *Self::START_MAX_SIZE {
             return Err(anyhow!("invalid packet size"));
@@ -36,15 +36,13 @@ impl LoginRequest {
         })
     }
 
-    pub async fn answer<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W) -> Result<()> {
+    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(&self, writer: &mut W) -> Result<()> {
         let uuid = types::String::new(Self::RANDOM_UUID);
 
-        writer
-            .write_var_int(Self::SUCCESS_PACKET_ID.size() + uuid.size() + self.user_name.size())
-            .await?;
-        writer.write_var_int(Self::SUCCESS_PACKET_ID).await?;
-        writer.write_string(&uuid).await?;
-        writer.write_string(&self.user_name).await?;
+        (Self::SUCCESS_PACKET_ID.size() + uuid.size() + self.user_name.size()).send(writer).await?;
+        Self::SUCCESS_PACKET_ID.send(writer).await?;
+        uuid.send(writer).await?;
+        self.user_name.send(writer).await?;
         Ok(())
     }
 }

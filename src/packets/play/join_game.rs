@@ -5,8 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use crate::impl_size;
-use crate::stream::WriteExtension;
+use crate::{impl_size, impl_send};
 use crate::types::{self, Send, Size, VarInt};
 
 #[derive(macro_derive::Size, macro_derive::Send, Debug)]
@@ -29,10 +28,8 @@ impl JoinGame {
         &self,
         writer: &mut W,
     ) -> Result<()> {
-        writer
-            .write_var_int(Self::PACKET_ID.size() + self.size())
-            .await?;
-        writer.write_var_int(Self::PACKET_ID).await?;
+        (Self::PACKET_ID.size() + self.size()).send(writer).await?;
+        Self::PACKET_ID.send(writer).await?;
         self.send(writer).await?;
         Ok(())
     }
@@ -66,13 +63,7 @@ pub enum GameMode {
     Spectator,
 }
 impl_size!(GameMode, 1);
-
-#[async_trait::async_trait]
-impl types::Send for GameMode {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        writer.write_u8(*self as u8).await
-    }
-}
+impl_send!(GameMode as u8);
 
 #[derive(Copy, Clone, Debug)]
 #[repr(i8)]
@@ -82,13 +73,14 @@ pub enum Dimension {
     End,
 }
 impl_size!(Dimension, 1);
+impl_send!(Dimension as i8);
 
-#[async_trait::async_trait]
-impl types::Send for Dimension {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        writer.write_i8(*self as i8).await
-    }
-}
+// #[async_trait::async_trait]
+// impl types::Send for Dimension {
+//     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+//         writer.write_i8(*self as i8).await
+//     }
+// }
 
 #[derive(Copy, Clone, Debug)]
 pub enum LevelType {
@@ -130,8 +122,6 @@ impl Size for LevelType {
 #[async_trait::async_trait]
 impl types::Send for LevelType {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        writer
-            .write_string(&types::String::new(&self.to_string()))
-            .await
+        types::String::new(&self.to_string()).send(writer).await
     }
 }

@@ -48,45 +48,6 @@ pub trait ReadExtension: AsyncRead + Unpin + Sized {
 
 impl<R: AsyncRead + Unpin> ReadExtension for R {}
 
-#[async_trait]
-pub trait WriteExtension: AsyncWrite + Unpin + Sized {
-    async fn write_u8(&mut self, n: u8) -> Result<()> {
-        let buff = [n; 1];
-        self.write_all(&buff).await?;
-        Ok(())
-    }
-
-    async fn write_i8(&mut self, n: i8) -> Result<()> {
-        self.write_u8(n as u8).await?;
-        Ok(())
-    }
-
-    async fn write_i32(&mut self, n: i32) -> Result<()> {
-        self.write_all(&n.to_be_bytes()).await?;
-        Ok(())
-    }
-
-    async fn write_i64(&mut self, n: i64) -> Result<()> {
-        self.write_all(&n.to_be_bytes()).await?;
-        Ok(())
-    }
-
-    async fn write_bool(&mut self, b: bool) -> Result<()> {
-        self.write_u8(b.into()).await?;
-        Ok(())
-    }
-
-    async fn write_var_int(&mut self, n: VarInt) -> Result<()> {
-        n.write(self).await
-    }
-
-    async fn write_string(&mut self, s: &String) -> Result<()> {
-        s.write(self).await
-    }
-}
-
-impl<W: AsyncWrite + Unpin> WriteExtension for W {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

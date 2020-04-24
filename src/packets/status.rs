@@ -1,8 +1,8 @@
 use futures::prelude::*;
 use std::marker::Unpin;
 
-use crate::stream::{ReadExtension, WriteExtension};
-use crate::types::{self, Size};
+use crate::stream::{ReadExtension};
+use crate::types::{self, Size, Send};
 use anyhow::{anyhow, Result};
 
 use serde::Serialize;
@@ -13,7 +13,7 @@ pub struct StatusRequest {}
 impl StatusRequest {
     const PACKET_ID: types::VarInt = types::VarInt(0x00);
 
-    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
         if *size != 1 {
             return Err(anyhow!("invalid packet size"));
@@ -27,7 +27,7 @@ impl StatusRequest {
         Ok(Self {})
     }
 
-    pub async fn answer<W: AsyncWrite + Unpin + Send>(
+    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(
         &self,
         writer: &mut W,
         description: &ServerDescription,
@@ -45,14 +45,12 @@ impl StatusRequest {
                 },
                 "favicon": description.icon_data()
             })
-            .to_string(),
+                .to_string(),
         );
 
-        writer
-            .write_var_int(Self::PACKET_ID.size() + info.size())
-            .await?;
-        writer.write_var_int(Self::PACKET_ID).await?;
-        writer.write_string(&info).await?;
+        (Self::PACKET_ID.size() + info.size()).send(writer).await?;
+        Self::PACKET_ID.send(writer).await?;
+        info.send(writer).await?;
         Ok(())
     }
 }
@@ -88,6 +86,7 @@ impl Default for Version {
     }
 }
 
+#[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct PingRequest {
     payload: i64,
 }
@@ -95,7 +94,7 @@ pub struct PingRequest {
 impl PingRequest {
     const PACKET_ID: types::VarInt = types::VarInt(0x01);
 
-    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
         if *size != *Self::PACKET_ID.size() + 8 {
             return Err(anyhow!("invalid packet size"));
@@ -111,12 +110,10 @@ impl PingRequest {
         })
     }
 
-    pub async fn answer<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W) -> Result<()> {
-        writer
-            .write_var_int(Self::PACKET_ID.size() + types::VarInt::new(8))
-            .await?;
-        writer.write_var_int(Self::PACKET_ID).await?;
-        writer.write_i64(self.payload).await?;
+    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(&self, writer: &mut W) -> Result<()> {
+        (Self::PACKET_ID.size() + self.size()).send(writer).await?;
+        Self::PACKET_ID.send(writer).await?;
+        self.send(writer).await?;
         Ok(())
     }
 }

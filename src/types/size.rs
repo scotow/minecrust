@@ -8,7 +8,7 @@ pub trait Size {
 #[macro_export]
 macro_rules! impl_size {
     ($type:ty, $size:literal) => {
-        impl Size for $type {
+        impl $crate::types::Size for $type {
             fn size(&self) -> VarInt {
                 VarInt::new($size)
             }

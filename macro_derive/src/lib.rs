@@ -24,7 +24,6 @@ pub fn derive_send(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl #impl_generics crate::types::Send for #struct_name #ty_generics #where_clause {
             async fn send<W: futures::io::AsyncWrite + std::marker::Send + std::marker::Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
                 use crate::types::Send;
-                use crate::stream::{ReadExtension, WriteExtension};
                 #send
                 Ok(())
             }

@@ -1,10 +1,11 @@
 use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
-use crate::stream::{ReadExtension, WriteExtension};
-use crate::types::Size;
+use crate::stream::{ReadExtension};
+use crate::types::{Size, Send};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use futures::prelude::*;
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -17,7 +18,7 @@ impl VarInt {
         Self(n)
     }
 
-    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
+    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
         let mut read_int: i32 = 0;
         let mut bytes_read: i32 = 0;
         loop {
@@ -31,21 +32,6 @@ impl VarInt {
             }
         }
     }
-
-    pub async fn write<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W) -> Result<()> {
-        let mut n = self.0 as u32;
-        loop {
-            let tmp = n as u8 & 0b0111_1111;
-            n >>= 7;
-            if n == 0 {
-                writer.write_u8(tmp).await?;
-                break;
-            } else {
-                writer.write_u8(tmp | 0b1000_0000).await?;
-            }
-        }
-        Ok(())
-    }
 }
 
 impl Size for VarInt {
@@ -55,6 +41,24 @@ impl Size for VarInt {
             0 => 1,
             1..=std::i32::MAX => ((self.0 as f64).log2() as i32) / 7 + 1,
         })
+    }
+}
+
+#[async_trait]
+impl Send for VarInt {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        let mut n = self.0 as u32;
+        loop {
+            let tmp = n as u8 & 0b0111_1111;
+            n >>= 7;
+            if n == 0 {
+                tmp.send(writer).await?;
+                break;
+            } else {
+                (tmp | 0b1000_0000).send(writer).await?;
+            }
+        }
+        Ok(())
     }
 }
 

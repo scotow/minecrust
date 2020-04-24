@@ -7,7 +7,7 @@ use std::net::TcpListener;
 use anyhow::Result;
 use smol::{Async, Task};
 
-use minecrust::packets::play::join_game::JoinGame;
+use minecrust::packets::play::join_game::{JoinGame, Dimension};
 use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
 use minecrust::stream::ReadExtension;
 use minecrust::types::{self, Size};
@@ -21,7 +21,7 @@ fn main() {
     // dbg!(it.size());
 
     let mut server_description: ServerDescription = Default::default();
-    server_description.players = (3, 42);
+    server_description.players = (1, 0);
     server_description.description = "Rusty Minecraft Server".to_string();
     server_description.icon = std::fs::read("./examples/assets/server-icon.png").ok();
 
