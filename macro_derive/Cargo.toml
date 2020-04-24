@@ -1,7 +1,7 @@
 [package]
 name = "macro_derive"
 version = "0.1.0"
-authors = ["Scotow <contact@scotow.com>"]
+authors = ["Scotow <contact@scotow.com>", "Thomas Campistron <irevoire@hotmail.fr>"]
 edition = "2018"
 
 [lib]
