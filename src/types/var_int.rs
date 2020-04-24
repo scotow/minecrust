@@ -1,11 +1,11 @@
 use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
-use crate::types::{self, Size};
 use crate::stream::{ReadExtension, WriteExtension};
+use crate::types::Size;
 
-use futures::prelude::*;
 use anyhow::{anyhow, Result};
+use futures::prelude::*;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct VarInt(pub i32);

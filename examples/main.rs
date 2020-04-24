@@ -4,13 +4,13 @@ use futures::prelude::*;
 use std::marker::Unpin;
 use std::net::TcpListener;
 
-use smol::{Async, Task};
 use anyhow::Result;
+use smol::{Async, Task};
 
+use minecrust::packets::play::join_game::JoinGame;
 use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
 use minecrust::stream::ReadExtension;
 use minecrust::types::{self, Size};
-use minecrust::packets::play::join_game::JoinGame;
 
 fn main() {
     let it = minecrust::packets::play::LeaveGame {
@@ -83,7 +83,7 @@ async fn handle_login(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send))
 
 async fn handle_play(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send)) -> Result<()> {
     let join_game = JoinGame::default();
-    join_game.send(stream).await?;
+    join_game.send_packet(stream).await?;
     stream.flush().await?;
 
     let mut buf = Vec::new();
