@@ -44,7 +44,7 @@ pub fn generate_send(data: &Data) -> TokenStream {
                         }
                     });
                     quote! {
-                        #(+ #recurse)*
+                        #(#recurse)*
                     }
                 }
                 Fields::Unit => quote!(),

@@ -5,8 +5,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use crate::{impl_size, impl_send};
 use crate::types::{self, Send, Size, VarInt};
+use crate::{impl_packet, impl_send, impl_size};
 
 #[derive(macro_derive::Size, macro_derive::Send, Debug)]
 pub struct JoinGame {
@@ -20,20 +20,7 @@ pub struct JoinGame {
     pub reduced_debug_info: bool,
     pub enable_respawn_screen: bool,
 }
-
-impl JoinGame {
-    const PACKET_ID: types::VarInt = types::VarInt(0x26);
-
-    pub async fn send_packet<W: AsyncWrite + marker::Unpin + marker::Send>(
-        &self,
-        writer: &mut W,
-    ) -> Result<()> {
-        (Self::PACKET_ID.size() + self.size()).send(writer).await?;
-        Self::PACKET_ID.send(writer).await?;
-        self.send(writer).await?;
-        Ok(())
-    }
-}
+impl_packet!(JoinGame, 0x26);
 
 impl Default for JoinGame {
     fn default() -> Self {
@@ -42,7 +29,7 @@ impl Default for JoinGame {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs() as i32,
-            game_mode: GameMode::Survival,
+            game_mode: GameMode::Creative,
             dimension: Dimension::Overworld,
             hash_seed: 0,
             max_player: 0,
@@ -66,14 +53,14 @@ impl_size!(GameMode, 1);
 impl_send!(GameMode as u8);
 
 #[derive(Copy, Clone, Debug)]
-#[repr(i8)]
+#[repr(i32)]
 pub enum Dimension {
     Nether = -1,
     Overworld,
     End,
 }
-impl_size!(Dimension, 1);
-impl_send!(Dimension as i8);
+impl_size!(Dimension, 4);
+impl_send!(Dimension as i32);
 
 // #[async_trait::async_trait]
 // impl types::Send for Dimension {

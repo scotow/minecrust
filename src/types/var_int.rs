@@ -1,14 +1,14 @@
 use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
-use crate::stream::{ReadExtension};
-use crate::types::{Size, Send};
+use crate::stream::ReadExtension;
+use crate::types::{Send, Size};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::prelude::*;
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, PartialEq, Eq)]
 pub struct VarInt(pub i32);
 
 impl VarInt {

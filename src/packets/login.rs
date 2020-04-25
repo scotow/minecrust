@@ -1,7 +1,7 @@
 use futures::prelude::*;
 
-use crate::stream::{ReadExtension};
-use crate::types::{self, Size, Send};
+use crate::stream::ReadExtension;
+use crate::types::{self, Send, Size};
 use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 
@@ -36,10 +36,15 @@ impl LoginRequest {
         })
     }
 
-    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(&self, writer: &mut W) -> Result<()> {
+    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(
+        &self,
+        writer: &mut W,
+    ) -> Result<()> {
         let uuid = types::String::new(Self::RANDOM_UUID);
 
-        (Self::SUCCESS_PACKET_ID.size() + uuid.size() + self.user_name.size()).send(writer).await?;
+        (Self::SUCCESS_PACKET_ID.size() + uuid.size() + self.user_name.size())
+            .send(writer)
+            .await?;
         Self::SUCCESS_PACKET_ID.send(writer).await?;
         uuid.send(writer).await?;
         self.user_name.send(writer).await?;

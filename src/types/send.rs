@@ -22,33 +22,55 @@ macro_rules! _impl_send_primitives {
     }
 }
 
-_impl_send_primitives!(u8, u16, u32, u64, i8, i16, i32, i64);
+_impl_send_primitives!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
 
 #[macro_export]
 macro_rules! impl_send {
     ($type:tt as $repr:tt) => {
         #[async_trait::async_trait]
         impl $crate::types::Send for $type {
-            async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
+            async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(
+                &self,
+                writer: &mut W,
+            ) -> anyhow::Result<()> {
+                #[allow(unused_imports)]
                 use $crate::types::Send;
-                // <$repr>::send(*self as $repr, writer).await
                 (*self as $repr).send(writer).await
             }
         }
-    };
-    // ($type:tt) => {
-    //     #[async_trait::async_trait]
-    //     impl $crate::types::Send for $type {
-    //         async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
-    //             concat_idents!(writer.write_, $type)(*self).await
-    //         }
-    //     }
-    // };
+    }; // ($type:tt) => {
+       //     #[async_trait::async_trait]
+       //     impl $crate::types::Send for $type {
+       //         async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
+       //             concat_idents!(writer.write_, $type)(*self).await
+       //         }
+       //     }
+       // };
 }
 
 #[async_trait]
 impl Send for bool {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
         (*self as u8).send(writer).await
+    }
+}
+
+#[async_trait]
+impl<T: Send + Sync> Send for Option<T> {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        match self {
+            Some(t) => t.send(writer).await,
+            None => Ok(())
+        }
+    }
+}
+
+#[async_trait]
+impl<T: Send + Sync> Send for Vec<T> {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        for i in self.iter() {
+            i.send(writer).await?;
+        }
+        Ok(())
     }
 }

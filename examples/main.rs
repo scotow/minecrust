@@ -7,19 +7,17 @@ use std::net::TcpListener;
 use anyhow::Result;
 use smol::{Async, Task};
 
-use minecrust::packets::play::join_game::{JoinGame, Dimension};
-use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
+use minecrust::packets::play::held_item_slot::HeldItemSlot;
+use minecrust::packets::play::join_game::{Dimension, JoinGame};
+use minecrust::packets::play::recipes::Recipes;
+use minecrust::packets::{Handshake, LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
 use minecrust::stream::ReadExtension;
 use minecrust::types::{self, Size};
+use minecrust::packets::play::slot::{Slot, Window};
+use minecrust::packets::play::chunk::Chunk;
+use minecrust::packets::play::position::Position;
 
 fn main() {
-    let it = minecrust::packets::play::LeaveGame {
-        id: 0,
-        foo: types::VarInt::new(300),
-        name: types::String::new("hello, world!"),
-    };
-    // dbg!(it.size());
-
     let mut server_description: ServerDescription = Default::default();
     server_description.players = (1, 0);
     server_description.description = "Rusty Minecraft Server".to_string();
@@ -66,8 +64,8 @@ async fn handle_status(
     stream.flush().await?;
     println!("Status sent.");
 
-    let ping_request = PingRequest::parse(stream).await?;
-    ping_request.answer(stream).await?;
+    let ping = Ping::parse(stream).await?;
+    ping.send_packet(stream).await?;
     stream.flush().await?;
     println!("Pong sent.");
     Ok(())
@@ -82,9 +80,31 @@ async fn handle_login(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send))
 }
 
 async fn handle_play(stream: &mut (impl AsyncRead + AsyncWrite + Unpin + Send)) -> Result<()> {
+    // let held_item = HeldItemSlot::default();
+    // held_item.send_packet(stream).await?;
+    // stream.flush().await?;
+
+    // let recipes = Recipes::default();
+    // recipes.send_packet(stream).await?;
+    // stream.flush().await?;
+
+    // let chunk_0 = Chunk::new("./examples/assets/chunk.data");
+    // chunk_0.send_packet(stream).await?;
+
     let join_game = JoinGame::default();
     join_game.send_packet(stream).await?;
     stream.flush().await?;
+    println!("Join game sent.");
+
+    let position = Position::default();
+    position.send_packet(stream).await?;
+    println!("Position sent.");
+
+    for i in 0..=45 {
+        let slot = Slot::empty(Window::Inventory, i);
+        slot.send_packet(stream).await?;
+    }
+    HeldItemSlot::new(4)?.send_packet(stream).await?;
 
     let mut buf = Vec::new();
     stream.read_to_end(&mut buf).await;

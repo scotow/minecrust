@@ -1,9 +1,11 @@
 use futures::prelude::*;
 use std::marker::Unpin;
 
-use crate::stream::{ReadExtension};
-use crate::types::{self, Size, Send};
-use anyhow::{anyhow, Result};
+use crate::impl_packet;
+use crate::packets::Packet;
+use crate::stream::ReadExtension;
+use crate::types::{self, Send, Size};
+use anyhow::{anyhow, ensure, Result};
 
 use serde::Serialize;
 use serde_json::json;
@@ -87,33 +89,23 @@ impl Default for Version {
 }
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
-pub struct PingRequest {
+pub struct Ping {
     payload: i64,
 }
 
-impl PingRequest {
-    const PACKET_ID: types::VarInt = types::VarInt(0x01);
-
+impl Ping {
     pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
-        if *size != *Self::PACKET_ID.size() + 8 {
-            return Err(anyhow!("invalid packet size"));
-        }
+        ensure!(
+            size == Self::PACKET_ID.size() + 0_i64.size(),
+            "invalid packet size: {}",
+            *size
+        );
 
-        let id = reader.read_var_int().await?;
-        if *id != *Self::PACKET_ID {
-            return Err(anyhow!("unexpected non ping packet id"));
-        }
-
+        let _id = reader.read_var_int().await?;
         Ok(Self {
             payload: reader.read_i64().await?,
         })
     }
-
-    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(&self, writer: &mut W) -> Result<()> {
-        (Self::PACKET_ID.size() + self.size()).send(writer).await?;
-        Self::PACKET_ID.send(writer).await?;
-        self.send(writer).await?;
-        Ok(())
-    }
 }
+impl_packet!(Ping, 0x01);

@@ -2,13 +2,13 @@ use std::marker::Unpin;
 use std::ops::Deref;
 use std::string::String as StdString;
 
-use crate::stream::{ReadExtension};
-use crate::types::{self, Size, Send};
+use crate::stream::ReadExtension;
+use crate::types::{self, Send, Size};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use futures::prelude::*;
 use futures::AsyncWriteExt;
-use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct String(StdString);
