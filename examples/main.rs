@@ -7,15 +7,15 @@ use std::net::TcpListener;
 use anyhow::Result;
 use smol::{Async, Task};
 
+use minecrust::packets::play::chunk::Chunk;
 use minecrust::packets::play::held_item_slot::HeldItemSlot;
 use minecrust::packets::play::join_game::{Dimension, JoinGame};
+use minecrust::packets::play::position::Position;
 use minecrust::packets::play::recipes::Recipes;
+use minecrust::packets::play::slot::{Slot, Window};
 use minecrust::packets::{Handshake, LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
 use minecrust::stream::ReadExtension;
 use minecrust::types::{self, Size};
-use minecrust::packets::play::slot::{Slot, Window};
-use minecrust::packets::play::chunk::Chunk;
-use minecrust::packets::play::position::Position;
 
 fn main() {
     let mut server_description: ServerDescription = Default::default();
@@ -29,6 +29,7 @@ fn main() {
     smol::run(async {
         while let Some(stream) = incoming.next().await {
             let stream = stream.unwrap();
+            futures::io::BufReader::new(stream);
             Task::spawn(handle_connexion(stream, server_description))
                 .unwrap()
                 .detach();
