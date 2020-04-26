@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::prelude::*;
 
-#[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, PartialEq, Eq, Hash)]
 pub struct VarInt(pub i32);
 
 impl VarInt {
