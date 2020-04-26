@@ -3,17 +3,17 @@ use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
 use futures::{AsyncRead, AsyncWrite};
 use futures_timer::Delay;
-use piper::{Mutex, Receiver, Sender};
+use piper::{Mutex, Receiver, Sender, Arc};
 use std::collections::HashMap;
 use std::time::Duration;
 
-pub struct World<S: AsyncRead + AsyncWrite + Unpin + Send> {
-    players: HashMap<types::VarInt, Player<S>>,
-    player_receiver: Receiver<Player<S>>,
+pub struct World<R, W> {
+    players: HashMap<types::VarInt, Player<R, W>>,
+    player_receiver: Receiver<Player<R, W>>,
 }
 
-impl<S: AsyncRead + AsyncWrite + Unpin + Send> World<S> {
-    pub fn new() -> (Self, Sender<Player<S>>) {
+impl<R: AsyncRead, W: AsyncWrite + Send + Unpin> World<R, W> {
+    pub fn new() -> (Self, Sender<Player<R, W>>) {
         let (sender, receiver) = piper::chan(1);
         (
             Self {
@@ -26,7 +26,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> World<S> {
 
     pub async fn run(self, heartbeat: Duration) {
         let (players, player_receiver) = (self.players, self.player_receiver);
-        let players = Mutex::new(players); // TODO: move to a RW lock
+        let players = Arc::new(Mutex::new(players)); // TODO: move to a RW lock
         let keep_alive_loop = async {
             loop {
                 let keep_alive_packet = KeepAlive::new();
