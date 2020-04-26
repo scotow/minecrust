@@ -1,9 +1,9 @@
+use crate::packets::Packet;
 use crate::types;
+use crate::types::VarInt;
+use anyhow::Result;
 use futures::{AsyncRead, AsyncWrite};
 use piper::{Arc, Mutex};
-use crate::types::VarInt;
-use crate::packets::Packet;
-use anyhow::Result;
 
 pub struct Player<S: AsyncRead + AsyncWrite + Unpin + Send> {
     read_stream: Arc<Mutex<S>>,
@@ -19,6 +19,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Player<S> {
             write_stream: stream,
             id: VarInt::default(),
         }
+    }
+
+    pub fn id(&self) -> VarInt {
+        self.id
     }
 
     pub async fn send_packet(&mut self, packet: &(impl Packet + Sync)) -> Result<()> {

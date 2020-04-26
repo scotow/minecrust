@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use crate::types;
 use crate::game::player::Player;
-use std::time::Duration;
-use futures::{AsyncRead, AsyncWrite};
-use piper::{Sender, Receiver, Mutex};
-use futures_timer::Delay;
 use crate::packets::play::keep_alive::KeepAlive;
+use crate::types;
+use futures::{AsyncRead, AsyncWrite};
+use futures_timer::Delay;
+use piper::{Mutex, Receiver, Sender};
+use std::collections::HashMap;
+use std::time::Duration;
 
 pub struct World<S: AsyncRead + AsyncWrite + Unpin + Send> {
     players: HashMap<types::VarInt, Player<S>>,
@@ -20,24 +20,27 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> World<S> {
                 players: HashMap::new(),
                 player_receiver: receiver,
             },
-            sender
+            sender,
         )
     }
 
-    pub async fn run(&mut self, heartbeat: Duration) {
-        let mutex = Mutex::new(self);
+    pub async fn run(self, heartbeat: Duration) {
+        let (players, player_receiver) = (self.players, self.player_receiver);
+        let players = Mutex::new(players); // TODO: move to a RW lock
         let keep_alive_loop = async {
             loop {
                 let keep_alive_packet = KeepAlive::new();
-                for player in mutex.lock().players.values_mut() {
+                for player in players.lock().values_mut() {
                     player.send_packet(&keep_alive_packet).await.unwrap();
                 }
                 Delay::new(heartbeat).await;
             }
         };
         let add_player_loop = async {
-            let player = self.player_receiver.recv().await.unwrap();
-            mutex.lock().players.insert();
+            let player = player_receiver.recv().await.unwrap();
+            players.lock().insert(player.id(), player);
         };
+
+        futures::join!(keep_alive_loop, add_player_loop);
     }
 }
