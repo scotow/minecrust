@@ -1,9 +1,5 @@
-use crate::types::{self};
-use crate::{impl_size, impl_send, impl_packet};
-use crate::packets::Packet;
-use futures::AsyncWrite;
-use anyhow::Result;
-use crate::types::{Size, Send};
+use crate::impl_packet;
+use crate::types;
 
 #[derive(Debug, Default, macro_derive::Size, macro_derive::Send)]
 pub struct Position {

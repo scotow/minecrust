@@ -1,11 +1,10 @@
 use futures::AsyncWrite;
 use std::fmt::{self, Display, Formatter};
-use std::marker;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use crate::types::{self, Send, Size, VarInt};
+use crate::types::{self, Size, VarInt};
 use crate::{impl_packet, impl_send, impl_size};
 
 #[derive(macro_derive::Size, macro_derive::Send, Debug)]
