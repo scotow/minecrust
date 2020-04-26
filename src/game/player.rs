@@ -5,26 +5,22 @@ use anyhow::Result;
 use futures::prelude::*;
 use piper::Mutex;
 
-pub struct Player<R: Send + Sync + Unpin, W: Send + Sync + Unpin> {
-    read_stream: Mutex<R>,
-    write_stream: Mutex<W>,
+pub struct Player {
+    read_stream: Mutex<Box<dyn AsyncRead + Send + Sync + Unpin>>,
+    write_stream: Mutex<Box<dyn AsyncWrite + Send + Sync + Unpin>>,
     id: types::VarInt,
 }
 
-impl<R: AsyncRead + Send + Sync + Unpin, W: AsyncWrite + Send + Sync + Unpin> Player<R, W> {
-    pub async fn new(mut reader: R, mut writer: W) -> Result<Option<Self>> {
-        let state = Response::new();
-        match state.next(&mut reader, &mut writer).await? {
-            Response::Handshake => panic!("This should never happens"),
-            Response::Status => return Ok(None),
-            Response::Play => {
-                return Ok(Some(Self {
-                    read_stream: Mutex::new(reader),
-                    write_stream: Mutex::new(writer),
-                    id: VarInt::default(),
-                }))
-            }
-        }
+impl Player {
+    pub async fn new(
+        mut reader: impl AsyncRead + Send + Sync + Unpin + 'static,
+        mut writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
+    ) -> Result<Option<Self>> {
+        return Ok(Some(Self {
+            read_stream: Mutex::new(Box::new(reader)),
+            write_stream: Mutex::new(Box::new(writer)),
+            id: VarInt::default(),
+        }));
     }
 
     pub fn id(&self) -> VarInt {
