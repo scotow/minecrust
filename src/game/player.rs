@@ -18,14 +18,19 @@ impl Player {
     ) -> Result<Option<Self>> {
         let state = Response::new();
         match state.next(&mut reader, &mut writer).await? {
-            Response::Handshake => panic!("This should never happens"),
-            Response::Status => return Ok(None),
-            Response::Play => {
+            Response::Handshake | Response::Finished => panic!("This should never happens"),
+            state @ Response::Status => {
+                // ignore what happens after a ping has been asked
+                let _ = state.next(&mut reader, &mut writer).await;
+                return Ok(None);
+            }
+            state @ Response::Play => {
+                state.next(&mut reader, &mut writer).await?;
                 return Ok(Some(Self {
                     read_stream: Mutex::new(Box::new(reader)),
                     write_stream: Mutex::new(Box::new(writer)),
                     id: VarInt::default(),
-                }))
+                }));
             }
         }
     }
@@ -47,6 +52,7 @@ enum Response {
     Handshake,
     Status,
     Play,
+    Finished,
 }
 
 impl Response {
@@ -79,22 +85,20 @@ impl Response {
                 let status_request = StatusRequest::parse(reader).await?;
                 status_request.answer(writer, &server_description).await?;
                 writer.flush().await?;
-                println!("Status sent.");
 
                 let ping = Ping::parse(reader).await?;
                 ping.send_packet(writer).await?;
                 writer.flush().await?;
-                println!("Pong sent.");
 
-                Ok(Response::Status)
+                Ok(Response::Finished)
             }
             Response::Play => {
                 let login_start = LoginRequest::parse(reader).await?;
                 login_start.answer(writer).await?;
-                // stream.flush().await?;
-                println!("{:?}", login_start);
-                Ok(Response::Play)
+                writer.flush().await?;
+                Ok(Response::Finished)
             }
+            Response::Finished => Ok(self),
         }
     }
 }
