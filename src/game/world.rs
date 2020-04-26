@@ -3,16 +3,16 @@ use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
 use futures::{AsyncRead, AsyncWrite};
 use futures_timer::Delay;
-use piper::{Mutex, Receiver, Sender, Arc};
+use piper::{Arc, Mutex, Receiver, Sender};
 use std::collections::HashMap;
 use std::time::Duration;
 
-pub struct World<R, W> {
+pub struct World<R: Send + Sync + Unpin, W: Send + Sync + Unpin> {
     players: HashMap<types::VarInt, Player<R, W>>,
     player_receiver: Receiver<Player<R, W>>,
 }
 
-impl<R: AsyncRead, W: AsyncWrite + Send + Unpin> World<R, W> {
+impl<R: AsyncRead + Send + Sync + Unpin, W: AsyncWrite + Send + Sync + Unpin> World<R, W> {
     pub fn new() -> (Self, Sender<Player<R, W>>) {
         let (sender, receiver) = piper::chan(1);
         (
