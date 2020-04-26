@@ -16,11 +16,18 @@ impl Player {
         mut reader: impl AsyncRead + Send + Sync + Unpin + 'static,
         mut writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
     ) -> Result<Option<Self>> {
-        return Ok(Some(Self {
-            read_stream: Mutex::new(Box::new(reader)),
-            write_stream: Mutex::new(Box::new(writer)),
-            id: VarInt::default(),
-        }));
+        let state = Response::new();
+        match state.next(&mut reader, &mut writer).await? {
+            Response::Handshake => panic!("This should never happens"),
+            Response::Status => return Ok(None),
+            Response::Play => {
+                return Ok(Some(Self {
+                    read_stream: Mutex::new(Box::new(reader)),
+                    write_stream: Mutex::new(Box::new(writer)),
+                    id: VarInt::default(),
+                }))
+            }
+        }
     }
 
     pub fn id(&self) -> VarInt {

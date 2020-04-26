@@ -1,7 +1,6 @@
 use crate::game::player::Player;
 use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
-use futures::{AsyncRead, AsyncWrite};
 use futures_timer::Delay;
 use piper::{Arc, Mutex, Receiver, Sender};
 use std::collections::HashMap;
