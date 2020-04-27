@@ -28,19 +28,23 @@ impl World {
         let players = Arc::new(Mutex::new(players)); // TODO: move to a RW lock
         let keep_alive_loop = async {
             loop {
+                Delay::new(heartbeat).await;
                 let keep_alive_packet = KeepAlive::new();
+                // TODO: remove the for loop for a join_all
                 for player in players.lock().values_mut() {
                     player.send_packet(&keep_alive_packet).await.unwrap();
                 }
-                Delay::new(heartbeat).await;
             }
         };
         let add_player_loop = async {
-            let player = player_receiver.recv().await.unwrap();
-            let id = player.id();
-            players.lock().insert(id, player);
+            loop {
+                let player = player_receiver.recv().await.unwrap();
+                let id = player.id();
+                players.lock().insert(id, player);
+            }
         };
 
-        futures::join!(keep_alive_loop, add_player_loop);
+        // run forever
+        let _ = futures::join!(keep_alive_loop, add_player_loop);
     }
 }

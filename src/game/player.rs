@@ -1,6 +1,13 @@
+use crate::packets;
+use crate::packets::play::held_item_slot::HeldItemSlot;
+use crate::packets::play::join_game::JoinGame;
+use crate::packets::play::{
+    position::Position,
+    slot::{Slot, Window},
+};
 use crate::packets::{LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
-use crate::types::VarInt;
-use crate::{packets, types};
+
+use crate::types::{self, VarInt};
 use anyhow::Result;
 use futures::prelude::*;
 use piper::{Arc, Mutex};
@@ -45,8 +52,28 @@ impl Player {
         packet.send_packet(&mut self.write_stream).await
     }
 
-    pub async fn run(&mut self) -> ! {
-        loop {}
+    pub async fn run(&mut self) -> Result<()> {
+        let join_game = JoinGame::default();
+        join_game.send_packet(&mut self.write_stream).await?;
+        // early flush so the player can get in game faster
+        self.write_stream.flush().await?;
+
+        let position = Position::default();
+        position.send_packet(&mut self.write_stream).await?;
+
+        for i in 0..=45 {
+            let slot = Slot::empty(Window::Inventory, i);
+            slot.send_packet(&mut self.write_stream).await?;
+        }
+        HeldItemSlot::new(4)?
+            .send_packet(&mut self.write_stream)
+            .await?;
+        self.write_stream.flush().await?;
+
+        let mut buf = Vec::new();
+        self.read_stream.read_to_end(&mut buf).await?;
+        dbg!(buf);
+        Ok(())
     }
 }
 
@@ -70,7 +97,6 @@ impl Response {
         match self {
             Response::Handshake => {
                 let handshake = packets::Handshake::parse(reader).await?;
-                println!("{:?}", handshake);
 
                 Ok(match *handshake.next_state {
                     1 => Response::Status,

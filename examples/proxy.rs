@@ -4,7 +4,7 @@ use minecrust::stream::ReadExtension;
 use minecrust::types::{Send, Size};
 use piper::Arc;
 use smol::{Async, Task};
-use std::io::BufRead;
+
 use std::net::{TcpListener, TcpStream};
 
 fn main() {
@@ -19,7 +19,7 @@ fn main() {
 }
 
 async fn handle_connexion(
-    mut client_stream: Async<TcpStream>,
+    client_stream: Async<TcpStream>,
 ) -> Result<()> {
     let mut client_reader = Arc::new(client_stream);
     let mut client_writer = client_reader.clone();
@@ -46,7 +46,7 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: &str) ->
         let mut packet = Vec::with_capacity(*size as usize);
         size.send(&mut packet).await?;
 
-        let mut packet_id = reader.read_var_int().await?;
+        let packet_id = reader.read_var_int().await?;
         packet_id.send(&mut packet).await?;
 
         reader.take((*size - *packet_id.size()) as u64).read_to_end(&mut packet).await?;

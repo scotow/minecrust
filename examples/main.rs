@@ -10,14 +10,8 @@ use smol::{Async, Task};
 use futures::io::BufReader;
 use minecrust::game::player::Player;
 use minecrust::game::world::World;
-use minecrust::packets::play::chunk::Chunk;
-use minecrust::packets::play::held_item_slot::HeldItemSlot;
-use minecrust::packets::play::join_game::{Dimension, JoinGame};
-use minecrust::packets::play::position::Position;
-use minecrust::packets::play::recipes::Recipes;
 use minecrust::packets::play::slot::{Slot, Window};
 use minecrust::packets::{Handshake, LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
-use minecrust::stream::ReadExtension;
 use minecrust::types::{self, Size};
 use piper::{Arc, Mutex};
 use std::time::Duration;
@@ -28,13 +22,12 @@ fn main() -> ! {
     let listener = Async::<TcpListener>::bind("127.0.0.1:25565").unwrap();
     let mut incoming = listener.incoming();
     smol::run(async {
-        Task::spawn(world.run(Duration::from_secs(15))).detach();
+        Task::spawn(world.run(Duration::from_secs(5))).detach();
 
         while let Some(stream) = incoming.next().await {
             let stream = Arc::new(stream.unwrap());
             let player = Player::new(stream.clone(), stream.clone()).await.unwrap();
             if player.is_none() {
-                println!("ping");
                 continue;
             }
             let mut player = player.unwrap();
@@ -43,7 +36,8 @@ fn main() -> ! {
             Task::spawn(async move {
                 new_player.send(player.clone()).await;
                 player.run().await;
-            });
+            })
+            .detach();
         }
     });
     panic!("This should never happens");
