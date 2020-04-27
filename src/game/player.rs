@@ -3,11 +3,13 @@ use crate::types::VarInt;
 use crate::{packets, types};
 use anyhow::Result;
 use futures::prelude::*;
-use piper::Mutex;
+use piper::{Arc, Mutex};
 
+/// here we use the Arc to get interior mutability
+#[derive(Clone)]
 pub struct Player {
-    read_stream: Mutex<Box<dyn AsyncRead + Send + Sync + Unpin>>,
-    write_stream: Mutex<Box<dyn AsyncWrite + Send + Sync + Unpin>>,
+    read_stream: Arc<Mutex<Box<dyn AsyncRead + Send + Sync + Unpin>>>,
+    write_stream: Arc<Mutex<Box<dyn AsyncWrite + Send + Sync + Unpin>>>,
     id: types::VarInt,
 }
 
@@ -27,8 +29,8 @@ impl Player {
             state @ Response::Play => {
                 state.next(&mut reader, &mut writer).await?;
                 return Ok(Some(Self {
-                    read_stream: Mutex::new(Box::new(reader)),
-                    write_stream: Mutex::new(Box::new(writer)),
+                    read_stream: Arc::new(Mutex::new(Box::new(reader))),
+                    write_stream: Arc::new(Mutex::new(Box::new(writer))),
                     id: VarInt::default(),
                 }));
             }
@@ -43,7 +45,7 @@ impl Player {
         packet.send_packet(&mut self.write_stream).await
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self) -> ! {
         loop {}
     }
 }

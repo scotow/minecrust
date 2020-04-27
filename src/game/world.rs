@@ -37,7 +37,8 @@ impl World {
         };
         let add_player_loop = async {
             let player = player_receiver.recv().await.unwrap();
-            players.lock().insert(player.id(), player);
+            let id = player.id();
+            players.lock().insert(id, player);
         };
 
         futures::join!(keep_alive_loop, add_player_loop);
