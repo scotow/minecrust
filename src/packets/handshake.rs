@@ -5,13 +5,14 @@ use crate::stream::ReadExtension;
 use crate::types;
 use anyhow::{anyhow, Result};
 
-#[derive(Debug)]
+#[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct Handshake {
     pub protocol_version: types::VarInt,
     pub server_address: types::String,
     pub server_port: u16,
     pub next_state: types::VarInt,
 }
+crate::impl_packet!(Handshake, 0x00);
 
 impl Handshake {
     const PACKET_ID: types::VarInt = types::VarInt(0x00);
