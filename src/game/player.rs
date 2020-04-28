@@ -1,6 +1,7 @@
 use crate::packets::play::held_item_slot::HeldItemSlot;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::{
+    chunk::Chunk,
     position::Position,
     slot::{Slot, Window},
 };
@@ -59,7 +60,10 @@ impl Player {
         // early flush so the player can get in game faster
         self.write_stream.flush().await?;
 
-        let position = Position::default();
+        let mut position = Position::default();
+        // position.x = 234.0;
+        position.y = 5.0;
+        // position.z = 72.0;
         position.send_packet(&mut self.write_stream).await?;
 
         for i in 0..=45 {
@@ -70,6 +74,18 @@ impl Player {
             .send_packet(&mut self.write_stream)
             .await?;
         self.write_stream.flush().await?;
+
+        for x in -20..20 {
+            for y in -20..20 {
+                if x > 1 && y > 1 && (x + y) % 2 == 0 {
+                    continue;
+                }
+                use crate::types::Size;
+                let chunk = Chunk::new(x, y, "flat.data");
+                chunk.send_packet(&mut self.write_stream).await?;
+                self.write_stream.flush().await?;
+            }
+        }
 
         let mut buf = Vec::new();
         self.read_stream.read_to_end(&mut buf).await?;
