@@ -26,7 +26,9 @@ fn main() -> ! {
 
         while let Some(stream) = incoming.next().await {
             let stream = Arc::new(stream.unwrap());
-            let player = Player::new(stream.clone(), stream.clone()).await.unwrap();
+            let reader = futures::io::BufReader::new(stream.clone());
+            let writer = futures::io::BufWriter::new(stream.clone());
+            let player = Player::new(reader, writer).await.unwrap();
             if player.is_none() {
                 continue;
             }
