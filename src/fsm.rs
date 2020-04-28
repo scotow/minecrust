@@ -1,53 +1,59 @@
-use crate::types;
+use crate::packets;
+
+
+
+use crate::packets::{LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
 use anyhow::Result;
-use minecrust::packets::{Handshake, LoginRequest, PingRequest, ServerDescription, StatusRequest};
-use std::io::{Read, Write};
+
+
+use futures::prelude::*;
+
 
 pub enum State {
-    Handshake(Handshake),
-    Status(StatusRequest),
-    Ping(PingRequest),
-    Closed,
-    Login(LoginRequest),
+    Handshake(ServerDescription),
+    Status(ServerDescription),
+    Play,
+    Finished,
 }
 
-pub struct Fsm {
-    pub state: State,
-    description: ServerDescription,
-}
-
-impl Fsm {
-    pub fn init(stream: &mut (impl Read + Write), description: ServerDescription) -> Result<Self> {
-        Ok(Self {
-            state: State::Handshake(Handshake::parse(stream), description),
-        })
+impl State {
+    pub fn new(server_description: ServerDescription) -> Self {
+        State::Handshake(server_description)
     }
 
-    pub fn next(self) -> Result<Self> {
-        let next_state = match self.state {
-            State::Handshake(packet) => match *handshake.next_state {
-                1 => State::Status(StatusRequest::parse(stream)?),
-                2 => State::Login(LoginRequest::parse(stream)?),
-            },
-            State::Status(packet) => {
-                packet.answer(stream, self.description)?;
-                stream.flush()?;
-                State::Ping(PingRequest::parse(stream)?)
+    pub async fn next(
+        self,
+        reader: &mut (impl AsyncRead + Send + Sync + Unpin),
+        writer: &mut (impl AsyncWrite + Send + Sync + Unpin),
+    ) -> Result<Self> {
+        match self {
+            State::Handshake(server_description) => {
+                let handshake = packets::Handshake::parse(reader).await?;
+
+                Ok(match *handshake.next_state {
+                    1 => State::Status(server_description),
+                    2 => State::Play,
+                    _ => unreachable!(),
+                })
             }
-            State::Ping(packet) => {
-                packet.answer(stream)?;
-                stream.flush();
-                State::Closed
+            State::Status(server_description) => {
+                let status_request = StatusRequest::parse(reader).await?;
+                status_request.answer(writer, &server_description).await?;
+                writer.flush().await?;
+
+                let ping = Ping::parse(reader).await?;
+                ping.send_packet(writer).await?;
+                writer.flush().await?;
+
+                Ok(State::Finished)
             }
-            State::Login(LoginRequest) => {
-                packet.answer(stream)?;
-                stream.flush();
-                State::Closed
+            State::Play => {
+                let login_start = LoginRequest::parse(reader).await?;
+                login_start.answer(writer).await?;
+                writer.flush().await?;
+                Ok(State::Finished)
             }
-        };
-        Ok(Self {
-            state: next_state?,
-            ..self
-        })
+            State::Finished => Ok(self),
+        }
     }
 }

@@ -47,7 +47,7 @@ impl StatusRequest {
                 },
                 "favicon": description.icon_data()
             })
-                .to_string(),
+            .to_string(),
         );
 
         (Self::PACKET_ID.size() + info.size()).send(writer).await?;
@@ -57,7 +57,7 @@ impl StatusRequest {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ServerDescription {
     pub version: Version,
     pub players: (u32, u32),
@@ -73,7 +73,7 @@ impl ServerDescription {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Version {
     name: &'static str,
     protocol: u16,

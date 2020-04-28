@@ -1,12 +1,12 @@
-use crate::packets;
 use crate::packets::play::held_item_slot::HeldItemSlot;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::{
     position::Position,
     slot::{Slot, Window},
 };
-use crate::packets::{LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
+use crate::packets::{Packet, ServerDescription};
 
+use crate::fsm::State;
 use crate::types::{self, VarInt};
 use anyhow::Result;
 use futures::prelude::*;
@@ -24,16 +24,17 @@ impl Player {
     pub async fn new(
         mut reader: impl AsyncRead + Send + Sync + Unpin + 'static,
         mut writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
+        server_description: ServerDescription,
     ) -> Result<Option<Self>> {
-        let state = Response::new();
+        let state = State::new(server_description);
         match state.next(&mut reader, &mut writer).await? {
-            Response::Handshake | Response::Finished => panic!("This should never happens"),
-            state @ Response::Status => {
+            State::Handshake(_) | State::Finished => panic!("This should never happens"),
+            state @ State::Status(_) => {
                 // ignore what happens after a ping has been asked
                 let _ = state.next(&mut reader, &mut writer).await;
                 return Ok(None);
             }
-            state @ Response::Play => {
+            state @ State::Play => {
                 state.next(&mut reader, &mut writer).await?;
                 return Ok(Some(Self {
                     read_stream: Arc::new(Mutex::new(Box::new(reader))),
@@ -74,59 +75,5 @@ impl Player {
         self.read_stream.read_to_end(&mut buf).await?;
         dbg!(buf);
         Ok(())
-    }
-}
-
-enum Response {
-    Handshake,
-    Status,
-    Play,
-    Finished,
-}
-
-impl Response {
-    pub fn new() -> Self {
-        Response::Handshake
-    }
-
-    pub async fn next(
-        self,
-        reader: &mut (impl AsyncRead + Send + Sync + Unpin),
-        writer: &mut (impl AsyncWrite + Send + Sync + Unpin),
-    ) -> Result<Self> {
-        match self {
-            Response::Handshake => {
-                let handshake = packets::Handshake::parse(reader).await?;
-
-                Ok(match *handshake.next_state {
-                    1 => Response::Status,
-                    2 => Response::Play,
-                    _ => unreachable!(),
-                })
-            }
-            Response::Status => {
-                let mut server_description = ServerDescription::default();
-                server_description.players = (1, 0);
-                server_description.description = "Rusty Minecraft Server".to_string();
-                server_description.icon = std::fs::read("./examples/assets/server-icon.png").ok();
-
-                let status_request = StatusRequest::parse(reader).await?;
-                status_request.answer(writer, &server_description).await?;
-                writer.flush().await?;
-
-                let ping = Ping::parse(reader).await?;
-                ping.send_packet(writer).await?;
-                writer.flush().await?;
-
-                Ok(Response::Finished)
-            }
-            Response::Play => {
-                let login_start = LoginRequest::parse(reader).await?;
-                login_start.answer(writer).await?;
-                writer.flush().await?;
-                Ok(Response::Finished)
-            }
-            Response::Finished => Ok(self),
-        }
     }
 }
