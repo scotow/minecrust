@@ -11,17 +11,17 @@ impl<T> SizeVec<T> {
     }
 }
 
-impl<T: Size + Sync> Size for SizeVec<T> {
-    fn size(&self) -> types::VarInt {
-        types::VarInt::new(self.0.len() as i32).size() + self.0.size()
-    }
-}
-
 impl<T> std::ops::Deref for SizeVec<T> {
     type Target = Vec<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T: Size + Sync> Size for SizeVec<T> {
+    fn size(&self) -> types::VarInt {
+        types::VarInt::new(self.0.len() as i32).size() + self.0.size()
     }
 }
 

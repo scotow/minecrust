@@ -1,4 +1,4 @@
-use crate::types::{self, SizeVec};
+use crate::types::{self, SizeVec, Size, VarInt};
 use anyhow::Result;
 use bitvec::order::{Lsb0, Msb0};
 use bitvec::vec::BitVec;
@@ -11,41 +11,40 @@ pub struct Chunk {
     z: i32,
     full_chunk: bool,
     primary_bit_mask: types::VarInt,
-    heightmaps: nbt::Value,
-    /*
+    heightmaps: nbt::Blob,
     biomes: Vec<i32>,
-    data: Vec<ChunkSection>,
+    data: ChunkData,
     block_entities: SizeVec<u8>,
-    */
-    _inner: Vec<u8>,
 }
 crate::impl_packet!(Chunk, 0x22);
 
 impl Chunk {
     ///                              y z x
-    pub fn new(x: i32, z: i32, data: &[Vec<Vec<Block>>], path: &str) -> Self {
+    pub fn new(x: i32, z: i32, data: &[Vec<Vec<Block>>]) -> Self {
         let mut bitmask: i32 = 0;
-        let mut output_data = Vec::new();
+        let mut sections = Vec::new();
         let mut heightmaps = vec![vec![0; 16]; 16];
 
         for section_index in 0..16 {
-            let mut sub_section: Vec<Block> = Vec::new();
+            let mut section: Vec<Block> = Vec::new();
             for y in (section_index * 16)..((section_index + 1) * 16) {
                 for z in 0..16 {
                     for x in 0..16 {
                         if data[y][z][x] != Block::Air {
+                            // Notchian server adds 1 here, don't know why.
                             if heightmaps[z][x] < y {
                                 heightmaps[z][x] = y;
                             }
                             bitmask |= 1 << section_index;
                         }
-                        sub_section.push(data[y][z][x]);
+                        section.push(data[y][z][x]);
                     }
                 }
             }
             if bitmask & (1 << section_index) != 0 {
-                let chunk = ChunkSection::new(sub_section);
-                output_data.push(chunk);
+                let section = ChunkSection::new(section);
+                dbg!(section.size());
+                sections.push(section);
             }
         }
 
@@ -63,40 +62,23 @@ impl Chunk {
             .map(|el| *el as i64)
             .collect();
         let heightmaps: nbt::Value = heightmaps.into();
-        let mut hash = HashMap::new();
-        hash.insert("MOTION_BLOCKING".to_string(), heightmaps.clone());
-        hash.insert("WORLD_SURFACE".to_string(), heightmaps);
-        let heightmaps = nbt::Value::Compound(hash);
 
-        let mut hash = HashMap::new();
-        hash.insert("".to_string(), heightmaps);
-        let heightmaps = nbt::Value::Compound(hash);
-        let biomes = vec![2_i32; 1024];
+        let mut blob = nbt::Blob::new();
+        blob.insert("MOTION_BLOCKING".to_string(), heightmaps.clone());
+        blob.insert("WORLD_SURFACE".to_string(), heightmaps);
 
-        use crate::types::size::Size;
-        let data = std::fs::read(path).unwrap();
-        let size = *(x.size()
-            + z.size()
-            + true.size()
-            + types::VarInt(bitmask).size()
-            + heightmaps.size()
-            + biomes.size()) as usize;
-
-        // here we should get 8A 10 and it's not the case
-        dbg!(&data[size..size + 2]);
+        let biomes = vec![1_i32; 1024];
+        let data = ChunkData(sections);
 
         Self {
             x,
             z,
             full_chunk: true,
             primary_bit_mask: types::VarInt(bitmask),
-            heightmaps,
-            /*
+            heightmaps: blob,
             biomes,
-            data: output_data,
+            data,
             block_entities: SizeVec::new(),
-            */
-            _inner: data[size..].to_vec(),
         }
     }
 }
@@ -109,12 +91,21 @@ fn as_bitvec(value: usize) -> BitVec {
     res
 }
 
+// #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+// #[repr(u16)]
+// pub enum Block {
+//     Air = 0,
+//     Bedrock = 1,
+//     Dirt = 2,
+//     Grass = 3
+// }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[repr(u16)]
 pub enum Block {
     Air = 0,
-    Stone = 1,
+    Bedrock = 33,
     Dirt = 10,
+    Grass = 9,
 }
 
 impl Block {
@@ -132,7 +123,7 @@ impl Block {
 struct ChunkSection {
     block_count: i16,
     bits_per_block: u8,
-    palette: Option<u8>,
+    palette: Option<SizeVec<VarInt>>,
     data_array: SizeVec<i64>,
 }
 
@@ -149,6 +140,23 @@ impl ChunkSection {
 
         let data_array: Vec<i64> = data.as_slice().iter().map(|el| *el as i64).collect();
 
+        // if block_count == 4096 {
+        //     dbg!(block_count);
+        //     dbg!(data_array.len());
+        //     dbg!(data);
+        // } else {
+        //     println!("WUT?! invalid block count: {}", block_count);
+        // }
+
+        // let palette = SizeVec(
+        //     vec![
+        //         VarInt(0),
+        //         VarInt(33),
+        //         VarInt(10),
+        //         VarInt(50)
+        //     ]
+        // );
+
         Self {
             block_count,
             bits_per_block: 14,
@@ -158,7 +166,7 @@ impl ChunkSection {
     }
 }
 
-impl types::Size for nbt::Value {
+impl types::Size for nbt::Blob {
     fn size(&self) -> types::VarInt {
         let mut vec = Vec::new();
         self.to_writer(&mut vec).unwrap();
@@ -167,10 +175,28 @@ impl types::Size for nbt::Value {
 }
 
 #[async_trait::async_trait]
-impl types::Send for nbt::Value {
+impl types::Send for nbt::Blob {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
         let mut vec = Vec::new();
         self.to_writer(&mut vec)?;
         vec.send(writer).await
+    }
+}
+
+#[derive(Debug)]
+struct ChunkData(Vec<ChunkSection>);
+
+impl types::Size for ChunkData {
+    fn size(&self) -> types::VarInt {
+        let inner_size = self.0.size();
+        inner_size.size() + inner_size
+    }
+}
+
+#[async_trait::async_trait]
+impl types::Send for ChunkData {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        self.0.size().send(writer).await?;
+        self.0.send(writer).await
     }
 }

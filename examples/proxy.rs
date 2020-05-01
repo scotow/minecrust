@@ -55,24 +55,24 @@ where
 
         // futures::io::copy(server.take((*size - *packet_id.size()) as u64), client).await?;
 
-        if [0x00, 0x01, 0x02, 0x26, 0x36].contains(&*packet_id) {
+        if [0x00, 0x01, 0x02, 0x22, 0x26, 0x36].contains(&*packet_id) {
             println!("{}: {:02X?} ..", direction, *packet_id);
             writer.write_all(&packet).await?;
         } else if [
             0x48, 0x15, 0x4E, 0x4F, 0x4E, 0x3E, 0x19, 0x22, 0x32, 0x40, 0x5B, 0x5C, 0x41, 0x1C,
             0x12, 0x37, 0x34, 0x25, 0x17, 0x3F, 0x49, 0x30, 0x0E, 0x4A,
-        ]
-        .contains(&*packet_id)
-            && direction == "S -> C"
-        {
+        ].contains(&*packet_id) && direction == "S -> C" {
             // println!("{}: {:02X?}", direction, &packet[*size.size() as usize..]);
         } else {
             // println!("{}: {:02X?} ..", direction, *packet_id);
             // writer.write_all(&packet).await?;
         }
 
-        // if *packet_id == 0x25 {
-        //     println!("Size: {}", *size);
-        // }
+        let mut first = true;
+        if *packet_id == 0x22 && first {
+            first = false;
+            std::fs::write("minecrust_chunk3.bin", &packet);
+            // std::fs::write("mojang_chunk.bin", &packet);
+        }
     }
 }
