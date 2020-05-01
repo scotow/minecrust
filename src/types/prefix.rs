@@ -3,6 +3,37 @@ use anyhow::Result;
 use futures::AsyncWrite;
 
 #[derive(Debug, Clone, Default)]
+pub struct LengthVec<T: Sized>(pub Vec<T>);
+
+impl<T> LengthVec<T> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<T> std::ops::Deref for LengthVec<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Size + Sync> Size for LengthVec<T> {
+    fn size(&self) -> types::VarInt {
+        types::VarInt::new(self.0.len() as i32).size() + self.0.size()
+    }
+}
+
+#[async_trait::async_trait]
+impl<T: Send + Sync + std::marker::Send> Send for LengthVec<T> {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        types::VarInt::new(self.0.len() as i32).send(writer).await?;
+        self.0.send(writer).await
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct SizeVec<T: Sized>(pub Vec<T>);
 
 impl<T> SizeVec<T> {
@@ -19,16 +50,23 @@ impl<T> std::ops::Deref for SizeVec<T> {
     }
 }
 
+impl<T> std::ops::DerefMut for SizeVec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl<T: Size + Sync> Size for SizeVec<T> {
     fn size(&self) -> types::VarInt {
-        types::VarInt::new(self.0.len() as i32).size() + self.0.size()
+        let inner_size = self.0.size();
+        inner_size.size() + inner_size
     }
 }
 
 #[async_trait::async_trait]
-impl<T: Send + Sync + std::marker::Send> Send for SizeVec<T> {
+impl<T: Size + Send + Sync + std::marker::Send> Send for SizeVec<T> {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        types::VarInt::new(self.0.len() as i32).send(writer).await?;
+        self.0.size().send(writer).await?;
         self.0.send(writer).await
     }
 }

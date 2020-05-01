@@ -1,4 +1,4 @@
-use crate::types::{self, SizeVec, Size, VarInt};
+use crate::types::{self, LengthVec, Size, VarInt, SizeVec};
 use anyhow::Result;
 use bitvec::order::{Lsb0, Msb0};
 use bitvec::vec::BitVec;
@@ -13,8 +13,8 @@ pub struct Chunk {
     primary_bit_mask: types::VarInt,
     heightmaps: nbt::Blob,
     biomes: Vec<i32>,
-    data: ChunkData,
-    block_entities: SizeVec<u8>,
+    data: SizeVec<ChunkSection>,
+    block_entities: LengthVec<u8>,
 }
 crate::impl_packet!(Chunk, 0x22);
 
@@ -22,7 +22,7 @@ impl Chunk {
     ///                              y z x
     pub fn new(x: i32, z: i32, data: &[Vec<Vec<Block>>]) -> Self {
         let mut bitmask: i32 = 0;
-        let mut sections = Vec::new();
+        let mut sections = SizeVec::new();
         let mut heightmaps = vec![vec![0; 16]; 16];
 
         for section_index in 0..16 {
@@ -43,7 +43,6 @@ impl Chunk {
             }
             if bitmask & (1 << section_index) != 0 {
                 let section = ChunkSection::new(section);
-                dbg!(section.size());
                 sections.push(section);
             }
         }
@@ -68,7 +67,6 @@ impl Chunk {
         blob.insert("WORLD_SURFACE".to_string(), heightmaps);
 
         let biomes = vec![1_i32; 1024];
-        let data = ChunkData(sections);
 
         Self {
             x,
@@ -77,8 +75,8 @@ impl Chunk {
             primary_bit_mask: types::VarInt(bitmask),
             heightmaps: blob,
             biomes,
-            data,
-            block_entities: SizeVec::new(),
+            data: sections,
+            block_entities: LengthVec::new(),
         }
     }
 }
@@ -123,8 +121,8 @@ impl Block {
 struct ChunkSection {
     block_count: i16,
     bits_per_block: u8,
-    palette: Option<SizeVec<VarInt>>,
-    data_array: SizeVec<i64>,
+    palette: Option<LengthVec<VarInt>>,
+    data_array: LengthVec<i64>,
 }
 
 impl ChunkSection {
@@ -161,7 +159,7 @@ impl ChunkSection {
             block_count,
             bits_per_block: 14,
             palette: None,
-            data_array: SizeVec(data_array),
+            data_array: LengthVec(data_array),
         }
     }
 }
@@ -180,23 +178,5 @@ impl types::Send for nbt::Blob {
         let mut vec = Vec::new();
         self.to_writer(&mut vec)?;
         vec.send(writer).await
-    }
-}
-
-#[derive(Debug)]
-struct ChunkData(Vec<ChunkSection>);
-
-impl types::Size for ChunkData {
-    fn size(&self) -> types::VarInt {
-        let inner_size = self.0.size();
-        inner_size.size() + inner_size
-    }
-}
-
-#[async_trait::async_trait]
-impl types::Send for ChunkData {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        self.0.size().send(writer).await?;
-        self.0.send(writer).await
     }
 }
