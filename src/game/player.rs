@@ -1,7 +1,7 @@
+use crate::packets::play::chunk::{Block, Chunk};
 use crate::packets::play::held_item_slot::HeldItemSlot;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::{
-    chunk::Chunk,
     position::Position,
     slot::{Slot, Window},
 };
@@ -75,13 +75,24 @@ impl Player {
             .await?;
         self.write_stream.flush().await?;
 
-        for x in -20..20 {
-            for y in -20..20 {
-                if x > 1 && y > 1 && (x + y) % 2 == 0 {
-                    continue;
-                }
-                use crate::types::Size;
-                let chunk = Chunk::new(x, y, "flat.data");
+        let mut vec = vec![vec![vec![Block::Air; 16]; 16]; 256];
+        for z in 0..16 {
+            for x in 0..16 {
+                vec[4][z][x] = Block::Dirt;
+            }
+        }
+
+        /*
+        let chunk = Chunk::new(0, 0, &vec, "machin");
+        use futures::io::Cursor;
+        let mut buf = Cursor::new(Vec::new());
+        chunk.send_packet(&mut buf).await?;
+        std::fs::write("lalilou", &buf.get_ref());
+        */
+
+        for x in -4..4 {
+            for y in -4..4 {
+                let chunk = Chunk::new(x, y, &vec, "flat.data");
                 chunk.send_packet(&mut self.write_stream).await?;
                 self.write_stream.flush().await?;
             }

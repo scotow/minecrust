@@ -60,7 +60,7 @@ impl<T: Send + Sync> Send for Option<T> {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
         match self {
             Some(t) => t.send(writer).await,
-            None => Ok(())
+            None => Ok(()),
         }
     }
 }
@@ -68,6 +68,7 @@ impl<T: Send + Sync> Send for Option<T> {
 #[async_trait]
 impl<T: Send + Sync> Send for Vec<T> {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        // TODO: use write_all instead of .iter
         for i in self.iter() {
             i.send(writer).await?;
         }

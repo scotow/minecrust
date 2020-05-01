@@ -1,13 +1,27 @@
-use crate::types::{self, Size, Send};
-use futures::AsyncWrite;
+use crate::types::{self, Send, Size};
 use anyhow::Result;
+use futures::AsyncWrite;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SizeVec<T: Sized>(pub Vec<T>);
+
+impl<T> SizeVec<T> {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+}
 
 impl<T: Size + Sync> Size for SizeVec<T> {
     fn size(&self) -> types::VarInt {
         types::VarInt::new(self.0.len() as i32).size() + self.0.size()
+    }
+}
+
+impl<T> std::ops::Deref for SizeVec<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
