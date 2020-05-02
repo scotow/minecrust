@@ -95,13 +95,13 @@ impl Player {
         std::fs::write("lalilou", &buf.get_ref());
         */
 
-        for x in -4..4 {
-            for y in -4..4 {
-                let chunk = Chunk::new(x, y, &vec);
-                chunk.send_packet(&mut self.write_stream).await?;
-                self.write_stream.flush().await?;
-            }
-        }
+        // for x in -4..4 {
+        //     for y in -4..4 {
+        //         let chunk = Chunk::new(x, y, &vec);
+        //         chunk.send_packet(&mut self.write_stream).await?;
+        //         self.write_stream.flush().await?;
+        //     }
+        // }
 
         let mut buf = Vec::new();
         self.read_stream.read_to_end(&mut buf).await?;

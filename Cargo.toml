@@ -22,6 +22,7 @@ hematite-nbt = "0.4.1"
 [dev-dependencies]
 futures-await-test = "0.3.0"
 smol = "0.1.2"
+rand = "0.7.3"
 
 [workspace]
 members = ["macro_derive"]
