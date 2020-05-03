@@ -52,7 +52,9 @@ impl Player {
     }
 
     pub async fn send_packet(&mut self, packet: &(impl Packet + Sync)) -> Result<()> {
-        packet.send_packet(&mut self.write_stream).await
+        packet.send_packet(&mut self.write_stream).await?;
+        self.write_stream.flush().await?;
+        Ok(())
     }
 
     pub async fn run(&mut self) -> Result<()> {

@@ -6,6 +6,8 @@ use piper::Arc;
 use smol::{Async, Task};
 
 use std::net::{TcpListener, TcpStream};
+use std::fmt::Display;
+use serde::export::Formatter;
 
 fn main() {
     let listener = Async::<TcpListener>::bind("127.0.0.1:25566").unwrap();
@@ -28,16 +30,32 @@ async fn handle_connexion(client_stream: Async<TcpStream>) -> Result<()> {
 
     // ignore the result
     let _ = futures::join!(
-        filter_packet(&mut server_reader, &mut client_writer, "S -> C"),
-        filter_packet(&mut client_reader, &mut server_writer, "C -> S")
+        filter_packet(&mut server_reader, &mut client_writer, Direction::ServerToClient),
+        filter_packet(&mut client_reader, &mut server_writer, Direction::ClientToServer)
     );
     Ok(())
 }
 
-async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: &str) -> Result<()>
-where
-    R: AsyncRead + Unpin + Sized + std::marker::Send,
-    W: AsyncWrite + Unpin + std::marker::Send,
+#[derive(Copy, Clone, PartialEq)]
+enum Direction {
+    ServerToClient,
+    ClientToServer,
+}
+
+impl Display for Direction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Direction::ServerToClient => write!(f, "S - > C")?,
+            Direction::ClientToServer => write!(f, "C - > S")?,
+        }
+        Ok(())
+    }
+}
+
+async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Direction) -> Result<()>
+    where
+        R: AsyncRead + Unpin + Sized + std::marker::Send,
+        W: AsyncWrite + Unpin + std::marker::Send,
 {
     loop {
         let size = reader.read_var_int().await?;
@@ -55,24 +73,28 @@ where
 
         // futures::io::copy(server.take((*size - *packet_id.size()) as u64), client).await?;
 
-        if [0x00, 0x01, 0x02, 0x22, 0x26, 0x36].contains(&*packet_id) {
+        if [0x00, 0x01, 0x02, 0x22, 0x26, 0x36, 0x21, 0x0F].contains(&*packet_id) {
             println!("{}: {:02X?} ..", direction, *packet_id);
             writer.write_all(&packet).await?;
         } else if [
             0x48, 0x15, 0x4E, 0x4F, 0x4E, 0x3E, 0x19, 0x22, 0x32, 0x40, 0x5B, 0x5C, 0x41, 0x1C,
             0x12, 0x37, 0x34, 0x25, 0x17, 0x3F, 0x49, 0x30, 0x0E, 0x4A,
-        ].contains(&*packet_id) && direction == "S -> C" {
+        ].contains(&*packet_id) && direction == Direction::ServerToClient {
             // println!("{}: {:02X?}", direction, &packet[*size.size() as usize..]);
         } else {
             // println!("{}: {:02X?} ..", direction, *packet_id);
             // writer.write_all(&packet).await?;
         }
 
-        let mut first = true;
-        if *packet_id == 0x22 && first {
-            first = false;
-            std::fs::write("minecrust_chunk8.bin", &packet);
-            // std::fs::write("mojang_chunk.bin", &packet);
+        // let mut first = true;
+        // if *packet_id == 0x22 && first {
+        //     first = false;
+        //     std::fs::write("minecrust_chunk8.bin", &packet);
+        //     // std::fs::write("mojang_chunk.bin", &packet);
+        // }
+
+        if *packet_id == 0x21 || *packet_id == 0x0F {
+            println!("{}: {:02X?}", direction, &packet);
         }
     }
 }
