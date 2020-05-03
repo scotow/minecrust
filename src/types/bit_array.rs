@@ -89,7 +89,7 @@ impl<T: Index<usize, Output=u64> + IndexMut<usize, Output=u64>> BitArray<T> {
         if start_index == end_index {
             let clear = !(!(!0_u64 << self.bits_per_value as u64) << start_bit);
             let mut buffer = self.data[start_index] & clear;
-            buffer |= (value as u64) << start_bit;
+            buffer |= ((value as u64) << start_bit) & !clear;
 
             self.data[start_index] = buffer;
         } else {
@@ -97,7 +97,7 @@ impl<T: Index<usize, Output=u64> + IndexMut<usize, Output=u64>> BitArray<T> {
 
             let clear = !(!(!0_u128 << self.bits_per_value as u128) << start_bit);
             let mut buffer = (((self.data[start_index + 1] as u128) << 64) | (self.data[start_index] as u128)) & clear;
-            buffer |= (value as u128) << start_bit;
+            buffer |= ((value as u128) << start_bit & !clear);
 
             self.data[start_index + 1] = (buffer >> 64) as u64;
             self.data[start_index] = buffer as u64;

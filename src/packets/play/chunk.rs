@@ -320,7 +320,7 @@ mod tests {
         heightmap.set(7, 0, 0b111_111_111);
         assert_eq!(heightmap.get(7, 0), 0b111_111_111);
 
-        let heightmap = Heightmap(BitArray::from_slice(&ALL_4_HEIGHTMAP, 9));
+        let heightmap = Heightmap(BitArray::<Vec<_>>::from_slice(&ALL_4_HEIGHTMAP, 9));
         for z in 0..16 {
             for x in 0..16 {
                 dbg!((z, x));
