@@ -73,17 +73,17 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
 
         // futures::io::copy(server.take((*size - *packet_id.size()) as u64), client).await?;
 
-        if [0x00, 0x01, 0x02, 0x22, 0x26, 0x36, 0x21, 0x0F].contains(&*packet_id) {
+        let server_to_client = vec![0x00, 0x01, 0x02, 0x22, 0x26, 0x36, 0x21, 0x0F];
+        let client_to_server = vec![0x00, 0x01, 0x02, 0x0F];
+
+        if (direction == Direction::ServerToClient && server_to_client.contains(&*packet_id)) ||
+            (direction == Direction::ClientToServer && client_to_server.contains(&*packet_id)) {
             println!("{}: {:02X?} ..", direction, *packet_id);
             writer.write_all(&packet).await?;
-        } else if [
-            0x48, 0x15, 0x4E, 0x4F, 0x4E, 0x3E, 0x19, 0x22, 0x32, 0x40, 0x5B, 0x5C, 0x41, 0x1C,
-            0x12, 0x37, 0x34, 0x25, 0x17, 0x3F, 0x49, 0x30, 0x0E, 0x4A,
-        ].contains(&*packet_id) && direction == Direction::ServerToClient {
-            // println!("{}: {:02X?}", direction, &packet[*size.size() as usize..]);
-        } else {
-            // println!("{}: {:02X?} ..", direction, *packet_id);
-            // writer.write_all(&packet).await?;
+        }
+
+        if direction == Direction::ServerToClient && *packet_id == 0x0F {
+            println!("{}: {:02X?}", direction, &packet);
         }
 
         // let mut first = true;
@@ -92,9 +92,5 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
         //     std::fs::write("minecrust_chunk8.bin", &packet);
         //     // std::fs::write("mojang_chunk.bin", &packet);
         // }
-
-        if *packet_id == 0x21 || *packet_id == 0x0F {
-            println!("{}: {:02X?}", direction, &packet);
-        }
     }
 }

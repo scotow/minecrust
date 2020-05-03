@@ -1,19 +1,18 @@
 use crate::packets::play::chunk::Chunk;
 use crate::packets::play::held_item_slot::HeldItemSlot;
 use crate::packets::play::join_game::JoinGame;
-use crate::packets::play::{
-    position::Position,
-    slot::{Slot, Window},
-};
+use crate::packets::play::{position::Position, slot::{Slot, Window}, chat_message};
 use crate::packets::{Packet, ServerDescription};
 
 use crate::fsm::State;
-use crate::types::{self, VarInt};
+use crate::types::{self, VarInt, Chat};
 use anyhow::Result;
 use futures::prelude::*;
 use piper::{Arc, Mutex};
 use std::time::Duration;
 use crate::packets::play::block::Block;
+use futures_timer::Delay;
+use crate::packets::play::chat_message::ChatMessage;
 
 /// here we use the Arc to get interior mutability
 #[derive(Clone)]
@@ -98,6 +97,16 @@ impl Player {
                 chunk.send_packet(&mut self.write_stream).await?;
                 self.write_stream.flush().await?;
             }
+        }
+
+        Delay::new(Duration::from_secs(3)).await;
+        for t in &[chat_message::Position::Chat, chat_message::Position::GameInfo, chat_message::Position::SystemMessage] {
+            let message = ChatMessage::new(
+                Chat::new("Hello, World!"),
+                *t,
+            );
+            self.send_packet(&message).await?;
+            Delay::new(Duration::from_secs(1)).await;
         }
 
         let mut buf = Vec::new();

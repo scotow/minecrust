@@ -55,3 +55,15 @@ impl Deref for String {
         &self.0
     }
 }
+
+impl From<StdString> for String {
+    fn from(s: StdString) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for String {
+    fn from(s: &str) -> Self {
+        Self::new(s)
+    }
+}

@@ -2,12 +2,13 @@ use crate::game::player::Player;
 use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
 use futures_timer::Delay;
-use piper::{Arc, Mutex, Receiver, Sender};
+use piper::{Arc, Mutex, Receiver, Sender, Lock};
 use std::collections::HashMap;
 use std::time::Duration;
+use crate::packets::Packet;
 
 pub struct World {
-    players: HashMap<types::VarInt, Player>,
+    players: Lock<HashMap<types::VarInt, Player>>,
     player_receiver: Receiver<Player>,
 }
 
@@ -16,35 +17,40 @@ impl World {
         let (sender, receiver) = piper::chan(1);
         (
             Self {
-                players: HashMap::new(),
+                players: Lock::new(HashMap::new()),
                 player_receiver: receiver,
             },
             sender,
         )
     }
 
-    pub async fn run(self, heartbeat: Duration) {
-        let (players, player_receiver) = (self.players, self.player_receiver);
-        let players = Arc::new(Mutex::new(players)); // TODO: move to a RW lock
+    pub async fn run(&self, heartbeat: Duration) {
+        let player_receiver = &self.player_receiver;
         let keep_alive_loop = async {
             loop {
                 Delay::new(heartbeat).await;
                 let keep_alive_packet = KeepAlive::new();
-                // TODO: remove the for loop for a join_all
-                for player in players.lock().values_mut() {
-                    player.send_packet(&keep_alive_packet).await.unwrap();
-                }
+                self.broadcast_packet(&keep_alive_packet).await;
             }
         };
         let add_player_loop = async {
             loop {
                 let player = player_receiver.recv().await.unwrap();
                 let id = player.id();
-                players.lock().insert(id, player);
+                self.players.lock().await.insert(id, player);
             }
         };
 
-        // run forever
+        // Run forever.
         let _ = futures::join!(keep_alive_loop, add_player_loop);
+    }
+
+    pub async fn broadcast_packet(&self, packet: &(impl Packet + Sync)) {
+        // TODO: Use a async RW lock.
+        let mut players = self.players.lock().await;
+        let iter = players.values_mut().map(|player| {
+            player.send_packet(packet)
+        });
+        futures::future::join_all(iter).await;
     }
 }
