@@ -51,13 +51,13 @@ impl Chunk {
     }
 
     pub fn set_block(&mut self, x: u8, y: u16, z: u8, block: Block) {
-        let chunk_index = y as usize / 16;
-        let section = match (&mut self.sections[chunk_index], block) {
+        let section_index = y as usize / 16;
+        let section = match (&mut self.sections[section_index], block) {
             (None, Block::Air) => return,
             (None, _) => {
                 let section = ChunkSection::new();
-                self.sections[chunk_index] = Some(section);
-                self.sections[chunk_index].as_mut().unwrap()
+                self.sections[section_index] = Some(section);
+                self.sections[section_index].as_mut().unwrap()
             },
             (Some(s), _) => s
         };
