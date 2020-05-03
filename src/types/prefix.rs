@@ -19,6 +19,12 @@ impl<T> std::ops::Deref for LengthVec<T> {
     }
 }
 
+impl<T> std::ops::DerefMut for LengthVec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl<T: Size + Sync> Size for LengthVec<T> {
     fn size(&self) -> types::VarInt {
         types::VarInt::new(self.0.len() as i32).size() + self.0.size()

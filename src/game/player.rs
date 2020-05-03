@@ -12,6 +12,7 @@ use crate::types::{self, VarInt};
 use anyhow::Result;
 use futures::prelude::*;
 use piper::{Arc, Mutex};
+use std::time::Duration;
 
 /// here we use the Arc to get interior mutability
 #[derive(Clone)]
@@ -75,33 +76,26 @@ impl Player {
             .await?;
         self.write_stream.flush().await?;
 
-        let mut vec = vec![vec![vec![Block::Air; 16]; 16]; 256];
-        // for y in 0..16 {
+
+        let mut chunk = Chunk::new(0, 0);
         for z in 0..16 {
             for x in 0..16 {
-                vec[0][z][x] = Block::Bedrock;
-                vec[1][z][x] = Block::Dirt;
-                vec[2][z][x] = Block::Dirt;
-                vec[3][z][x] = Block::Grass;
+                if (z + x) % 2 == 0 {
+                    chunk.set_block(x, 4, z, Block::WhiteConcrete);
+                } else {
+                    chunk.set_block(x, 4, z, Block::BlackConcrete);
+                }
             }
         }
-        // }
 
-        /*
-        let chunk = Chunk::new(0, 0, &vec, "machin");
-        use futures::io::Cursor;
-        let mut buf = Cursor::new(Vec::new());
-        chunk.send_packet(&mut buf).await?;
-        std::fs::write("lalilou", &buf.get_ref());
-        */
-
-        // for x in -4..4 {
-        //     for y in -4..4 {
-        //         let chunk = Chunk::new(x, y, &vec);
-        //         chunk.send_packet(&mut self.write_stream).await?;
-        //         self.write_stream.flush().await?;
-        //     }
-        // }
+        for x in -4..4 {
+            for z in -4..4 {
+                chunk.x = x;
+                chunk.z = z;
+                chunk.send_packet(&mut self.write_stream).await?;
+                self.write_stream.flush().await?;
+            }
+        }
 
         let mut buf = Vec::new();
         self.read_stream.read_to_end(&mut buf).await?;

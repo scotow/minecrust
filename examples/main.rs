@@ -26,7 +26,7 @@ fn main() -> ! {
     let listener = Async::<TcpListener>::bind("127.0.0.1:25565").unwrap();
     let mut incoming = listener.incoming();
     smol::run(async {
-        Task::spawn(world.run(Duration::from_secs(5))).detach();
+        Task::spawn(world.run(Duration::from_secs(1))).detach();
 
         while let Some(stream) = incoming.next().await {
             let stream = Arc::new(stream.unwrap());
