@@ -5,3 +5,4 @@ pub mod slot;
 pub mod chunk;
 pub mod position;
 pub mod keep_alive;
+pub mod block;

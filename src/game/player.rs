@@ -1,4 +1,4 @@
-use crate::packets::play::chunk::{Block, Chunk};
+use crate::packets::play::chunk::Chunk;
 use crate::packets::play::held_item_slot::HeldItemSlot;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::{
@@ -13,6 +13,7 @@ use anyhow::Result;
 use futures::prelude::*;
 use piper::{Arc, Mutex};
 use std::time::Duration;
+use crate::packets::play::block::Block;
 
 /// here we use the Arc to get interior mutability
 #[derive(Clone)]

@@ -10,6 +10,7 @@ use serde::export::Formatter;
 use std::fmt;
 use crate::{impl_size, impl_send};
 use std::ops::Add;
+use crate::packets::play::block::Block;
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -42,13 +43,14 @@ impl Chunk {
         VarInt::new(bitmask)
     }
 
-    pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) {
-        if block != Block::Air {
-            self.heightmap.replace_if_bigger(x, z, y as u16);
-        } else {
-            // TODO: Find the new lowest block in the column and replace.
+    pub fn get_block(&self, x: u8, y: u16, z: u8) -> Block {
+        if let Some(section) = &self.sections[y as usize / 16] {
+            return section.get(x, (y % 16) as u8, z);
         }
+        Block::Air
+    }
 
+    pub fn set_block(&mut self, x: u8, y: u16, z: u8, block: Block) {
         let chunk_index = y as usize / 16;
         let section = match (&mut self.sections[chunk_index], block) {
             (None, Block::Air) => return,
@@ -60,7 +62,21 @@ impl Chunk {
             (Some(s), _) => s
         };
 
-        section.set(x, y % 16, z, block);
+        // Set block in section.
+        section.set(x, (y % 16) as u8, z, block);
+
+        // Update heightmap if needed.
+        if block != Block::Air {
+            self.heightmap.replace_if_bigger(x, z, y as u16);
+        } else if y == self.heightmap.get(x, z) {
+            for i in (0..y - 1).rev() {
+                if self.get_block(x, i, z) != Block::Air {
+                    self.heightmap.set(x, z, i);
+                    return;
+                }
+            }
+            self.heightmap.set(x, z, 0);
+        }
     }
 }
 
@@ -146,26 +162,6 @@ impl types::Send for Heightmap {
         let mut vec = Vec::with_capacity(*self.size() as usize);
         Blob::from(self).to_writer(&mut vec);
         vec.send(writer).await
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-#[repr(u16)]
-pub enum Block {
-    Air = 0,
-    Bedrock = 33,
-    Dirt = 10,
-    Grass = 9,
-    Water = 49,
-    Lava = 50,
-    WhiteConcrete = 8902,
-    BlackConcrete = 8917,
-    HoneyBlock = 11335,
-}
-
-impl From<u16> for Block {
-    fn from(n: u16) -> Block {
-        unsafe { std::mem::transmute(n) }
     }
 }
 
