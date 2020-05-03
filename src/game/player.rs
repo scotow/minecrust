@@ -99,7 +99,7 @@ impl Player {
 
         let mut buf = Vec::new();
         self.read_stream.read_to_end(&mut buf).await?;
-        dbg!(buf);
+        dbg!(buf.len());
         Ok(())
     }
 }

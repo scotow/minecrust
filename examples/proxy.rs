@@ -71,7 +71,7 @@ where
         let mut first = true;
         if *packet_id == 0x22 && first {
             first = false;
-            std::fs::write("minecrust_chunk3.bin", &packet);
+            std::fs::write("minecrust_chunk8.bin", &packet);
             // std::fs::write("mojang_chunk.bin", &packet);
         }
     }

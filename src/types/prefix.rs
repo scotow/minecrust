@@ -1,6 +1,7 @@
 use crate::types::{self, Send, Size};
 use anyhow::Result;
 use futures::AsyncWrite;
+use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Clone, Default)]
 pub struct LengthVec<T: Sized>(pub Vec<T>);
@@ -8,6 +9,21 @@ pub struct LengthVec<T: Sized>(pub Vec<T>);
 impl<T> LengthVec<T> {
     pub fn new() -> Self {
         Self(Vec::new())
+    }
+    pub fn from(vec: Vec<T>) -> Self { Self(vec) }
+}
+
+impl<T> Index<usize> for LengthVec<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<T> IndexMut<usize> for LengthVec<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 

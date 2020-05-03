@@ -1,4 +1,4 @@
-use crate::types::{self, LengthVec, Size, VarInt, SizeVec};
+use crate::types::{self, LengthVec, Size, VarInt, SizeVec, BitArray};
 use anyhow::Result;
 use bitvec::order::{Lsb0, Msb0};
 use bitvec::vec::BitVec;
@@ -11,7 +11,7 @@ use std::fmt;
 use crate::{impl_size, impl_send};
 use std::ops::Add;
 
-// #[derive(Debug)]
+#[derive(Debug)]
 pub struct Chunk {
     pub x: i32,
     pub z: i32,
@@ -42,9 +42,9 @@ impl Chunk {
         VarInt::new(bitmask)
     }
 
-    pub fn set_block(&mut self, x: u8, y: i16, z: u8, block: Block) {
+    pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) {
         if block != Block::Air {
-            self.heightmap.replace_if_bigger(x, z, y);
+            self.heightmap.replace_if_bigger(x, z, y as u16);
         } else {
             // TODO: Find the new lowest block in the column and replace.
         }
@@ -60,7 +60,7 @@ impl Chunk {
             (Some(s), _) => s
         };
 
-        section.set(x, (y % 16) as u8, z, block);
+        section.set(x, y % 16, z, block);
     }
 }
 
@@ -94,59 +94,24 @@ impl types::Send for Chunk {
     }
 }
 
-#[derive(Clone)]
-struct Heightmap([i64; 36]);
+struct Heightmap(BitArray<Vec<u64>>);
 
 impl Heightmap {
     const MOTION_BLOCKING_KEY: &'static str = "MOTION_BLOCKING";
 
     fn new() -> Self {
-        Self([0; 36])
+        Self(BitArray::<Vec<u64>>::new(36, 9))
     }
 
-    fn get(&self, x: u8, z: u8) -> i16 {
-        let x = x as usize;
-        let z = z as usize;
-        let start_index = (z * 16 + x) * 9 / 64;
-        let end_index = ((z * 16 + x + 1) * 9 - 1) / 64;
-        let start_bit = (z * 16 + x) * 9 % 64;
-
-        if start_index == end_index {
-            let buffer = self.0[start_index] as u64;
-            let mask = 0b111_111_111_u64 << (start_bit as u64);
-
-            ((buffer & mask) >> (start_bit as u64)) as i16
-        } else {
-            let buffer = ((self.0[start_index + 1] as u64 as u128) << 64) | (self.0[start_index] as u64 as u128);
-            let mask = 0b111_111_111_u128 << (start_bit as u128);
-
-            ((buffer & mask) >> (start_bit as u128)) as i16
-        }
+    fn get(&self, x: u8, z: u8) -> u16 {
+        self.0.get((z as usize * 16) + x as usize)
     }
 
-    fn set(&mut self, x: u8, z: u8, value: i16) {
-        let x = x as usize;
-        let z = z as usize;
-        let start_index = (z * 16 + x) * 9 / 64;
-        let end_index = ((z * 16 + x + 1) * 9 - 1) / 64;
-        let start_bit = (z * 16 + x) * 9 % 64;
-
-        if start_index == end_index {
-            let clear = !(0b111_111_111_u64 << (start_bit as u64));
-            let mut buffer = self.0[start_index] as u64 & clear;
-            buffer |= (value as u64) << (start_bit as u64);
-            self.0[start_index] = buffer as i64;
-        } else {
-            let clear = !(0b111_111_111_u128 << (start_bit as u128));
-            let mut buffer = (((self.0[start_index + 1] as u64 as u128) << 64) | (self.0[start_index] as u64 as u128)) & clear;
-            buffer |= (value as u16 as u128) << (start_bit as u128);
-
-            self.0[start_index + 1] = (buffer >> 64) as i64;
-            self.0[start_index] = buffer as i64;
-        }
+    fn set(&mut self, x: u8, z: u8, value: u16) {
+        self.0.set((z as usize * 16) + x as usize, value);
     }
 
-    pub fn replace_if_bigger(&mut self, x: u8, z: u8, value: i16) {
+    pub fn replace_if_bigger(&mut self, x: u8, z: u8, value: u16) {
         if value > self.get(x, z) {
             self.set(x, z, value);
         }
@@ -155,15 +120,16 @@ impl Heightmap {
 
 impl From<&Heightmap> for Blob {
     fn from(heightmap: &Heightmap) -> Self {
+        let data: Vec<i64> = heightmap.0.as_slice().iter().map(|v| *v as i64).collect();
         let mut blob = nbt::Blob::new();
-        blob.insert(Heightmap::MOTION_BLOCKING_KEY.to_string(), &heightmap.0[..]).expect("invalid NBT array");
+        blob.insert(Heightmap::MOTION_BLOCKING_KEY.to_string(), data).expect("invalid NBT array");
         blob
     }
 }
 
 impl Debug for Heightmap {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        self.0[..].fmt(formatter)
+        self.0.as_slice().fmt(formatter)
     }
 }
 
@@ -183,14 +149,6 @@ impl types::Send for Heightmap {
     }
 }
 
-// #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-// #[repr(u16)]
-// pub enum Block {
-//     Air = 0,
-//     Bedrock = 1,
-//     Dirt = 2,
-//     Grass = 3
-// }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[repr(u16)]
 pub enum Block {
@@ -216,7 +174,7 @@ struct ChunkSection {
     block_count: i16,
     bits_per_block: u8,
     palette: Option<LengthVec<VarInt>>,
-    data: LengthVec<u64>,
+    data: BitArray<LengthVec<u64>>,
 }
 
 impl ChunkSection {
@@ -225,31 +183,12 @@ impl ChunkSection {
             block_count: 0,
             bits_per_block: 14,
             palette: None,
-            data: LengthVec(vec![0u64; 16 * 16 * 16 * 14 / 64]),
+            data: BitArray::<LengthVec<u64>>::new(16 * 16 * 16 * 14 / 64, 14),
         }
     }
 
     pub fn get(&self, x: u8, y: u8, z: u8) -> Block {
-        let x = x as usize;
-        let y = y as usize;
-        let z = z as usize;
-        let bits_per_block = self.bits_per_block as usize;
-
-        let start_index = (y * 256 + z * 16 + x) * bits_per_block / 64;
-        let end_index = ((y * 256 + z * 16 + x + 1) * bits_per_block - 1) / 64;
-        let start_bit = (y * 256 + z * 16 + x) * bits_per_block % 64;
-
-        if start_index == end_index {
-            let buffer = self.data[start_index] as u64;
-            let mask = !(!0_u64 << bits_per_block as u64) << (start_bit as u64);
-
-            ((buffer & mask) >> (start_bit as u64)) as u16
-        } else {
-            let buffer = ((self.data[start_index + 1] as u64 as u128) << 64) | (self.data[start_index] as u64 as u128);
-            let mask = !(!0_u128 << bits_per_block as u128) << (start_bit as u128);
-
-            ((buffer & mask) >> (start_bit as u128)) as u16
-        }.into()
+        self.data.get(y as usize * 256 + z as usize * 16 + x as usize).into()
     }
 
     pub fn set(&mut self, x: u8, y: u8, z: u8, new: Block) {
@@ -264,29 +203,7 @@ impl ChunkSection {
             self.block_count += 1;
         }
 
-        let x = x as usize;
-        let y = y as usize;
-        let z = z as usize;
-        let value = new as u16;
-        let bits_per_block = self.bits_per_block as usize;
-
-        let start_index = (y * 256 + z * 16 + x) * bits_per_block / 64;
-        let end_index = ((y * 256 + z * 16 + x + 1) * bits_per_block - 1) / 64;
-        let start_bit = (y * 256 + z * 16 + x) * bits_per_block % 64;
-
-        if start_index == end_index {
-            let clear = !(!(!0_u64 << bits_per_block as u64) << (start_bit as u64));
-            let mut buffer = self.data[start_index] as u64 & clear;
-            buffer |= (value as u64) << (start_bit as u64);
-            self.data[start_index] = buffer as u64;
-        } else {
-            let clear = !(!(!0_u128 << bits_per_block as u128) << (start_bit as u128));
-            let mut buffer = (((self.data[start_index + 1] as u64 as u128) << 64) | (self.data[start_index] as u64 as u128)) & clear;
-            buffer |= (value as u16 as u128) << (start_bit as u128);
-
-            self.data[start_index + 1] = (buffer >> 64) as u64;
-            self.data[start_index] = buffer as u64;
-        }
+        self.data.set(y as usize * 256 + z as usize * 16 + x as usize, new as u16);
     }
 }
 
@@ -346,32 +263,15 @@ pub enum Biome {
 impl_size!(Biome, 4);
 impl_send!(Biome as i32);
 
-// impl types::Size for nbt::Blob {
-//     fn size(&self) -> types::VarInt {
-//         let mut vec = Vec::new();
-//         self.to_writer(&mut vec).unwrap();
-//         vec.size()
-//     }
-// }
-//
-// #[async_trait::async_trait]
-// impl types::Send for nbt::Blob {
-//     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-//         let mut vec = Vec::new();
-//         self.to_writer(&mut vec)?;
-//         vec.send(writer).await
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::seq::SliceRandom;
 
-    const ALL_4_HEIGHTMAP: Heightmap = Heightmap([
+    const ALL_4_HEIGHTMAP: [u64; 36] = [
         72198606942111748,
         36099303471055874,
-        -9205322385119247871,
+        9241421688590303745,
         4620710844295151872,
         2310355422147575936,
         1155177711073787968,
@@ -380,7 +280,7 @@ mod tests {
         144397213884223496,
         72198606942111748,
         36099303471055874,
-        -9205322385119247871,
+        9241421688590303745,
         4620710844295151872,
         2310355422147575936,
         1155177711073787968,
@@ -389,7 +289,7 @@ mod tests {
         144397213884223496,
         72198606942111748,
         36099303471055874,
-        -9205322385119247871,
+        9241421688590303745,
         4620710844295151872,
         2310355422147575936,
         1155177711073787968,
@@ -398,14 +298,14 @@ mod tests {
         144397213884223496,
         72198606942111748,
         36099303471055874,
-        -9205322385119247871,
+        9241421688590303745,
         4620710844295151872,
         2310355422147575936,
         1155177711073787968,
         577588855536893984,
         288794427768446992,
         144397213884223496
-    ]);
+    ];
 
     #[test]
     fn test_heightmap() {
@@ -424,9 +324,11 @@ mod tests {
         heightmap.set(7, 0, 0b111_111_111);
         assert_eq!(heightmap.get(7, 0), 0b111_111_111);
 
+        let heightmap = Heightmap(BitArray::from_slice(&ALL_4_HEIGHTMAP, 9));
         for z in 0..16 {
             for x in 0..16 {
-                assert_eq!(ALL_4_HEIGHTMAP.get(x, z), 4);
+                dbg!((z, x));
+                assert_eq!(heightmap.get(x, z), 4);
             }
         }
 
@@ -445,7 +347,7 @@ mod tests {
             }
         }
 
-        assert_eq!(heightmap.0.to_vec(), ALL_4_HEIGHTMAP.0.to_vec());
+        assert_eq!(heightmap.0.as_slice(), &ALL_4_HEIGHTMAP[..]);
     }
 
     #[test]
