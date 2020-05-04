@@ -34,9 +34,11 @@ fn main() -> ! {
             let stream = Arc::new(stream.unwrap());
             let reader = futures::io::BufReader::new(stream.clone());
             let writer = futures::io::BufWriter::new(stream.clone());
-            let player = Player::new(reader, writer, server_description.clone())
-                .await
-                .unwrap();
+            let player = Player::new(
+                reader, writer,
+                server_description.clone(),
+                world,
+            ).await.unwrap();
             if player.is_none() {
                 continue;
             }

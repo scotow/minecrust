@@ -9,16 +9,19 @@ use crate::types::{self, VarInt, Chat};
 use anyhow::Result;
 use futures::prelude::*;
 use piper::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::packets::play::block::Block;
 use futures_timer::Delay;
-use crate::packets::play::chat_message::ChatMessage;
+use crate::packets::play::chat_message::{OutChatMessage, InChatMessage};
+use crate::game::world::World;
+use crate::stream::ReadExtension;
 
 /// here we use the Arc to get interior mutability
 #[derive(Clone)]
 pub struct Player {
     read_stream: Arc<Mutex<Box<dyn AsyncRead + Send + Sync + Unpin>>>,
     write_stream: Arc<Mutex<Box<dyn AsyncWrite + Send + Sync + Unpin>>>,
+    world: &'static World,
     id: types::VarInt,
 }
 
@@ -27,6 +30,7 @@ impl Player {
         mut reader: impl AsyncRead + Send + Sync + Unpin + 'static,
         mut writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
         server_description: ServerDescription,
+        world: &'static World
     ) -> Result<Option<Self>> {
         let state = State::new(server_description);
         match state.next(&mut reader, &mut writer).await? {
@@ -41,7 +45,8 @@ impl Player {
                 return Ok(Some(Self {
                     read_stream: Arc::new(Mutex::new(Box::new(reader))),
                     write_stream: Arc::new(Mutex::new(Box::new(writer))),
-                    id: VarInt::default(),
+                    world,
+                    id: VarInt::new(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i32),
                 }));
             }
         }
@@ -78,7 +83,6 @@ impl Player {
             .await?;
         self.write_stream.flush().await?;
 
-
         let mut chunk = Chunk::new(0, 0);
         for z in 0..16 {
             for x in 0..16 {
@@ -99,19 +103,29 @@ impl Player {
             }
         }
 
-        Delay::new(Duration::from_secs(3)).await;
-        for t in &[chat_message::Position::Chat, chat_message::Position::GameInfo, chat_message::Position::SystemMessage] {
-            let message = ChatMessage::new(
-                Chat::new("Hello, World!"),
-                *t,
-            );
-            self.send_packet(&message).await?;
-            Delay::new(Duration::from_secs(1)).await;
+        let message = OutChatMessage::new(
+            Chat::new("Welcome in Minecrust!"),
+            chat_message::Position::GameInfo,
+        );
+        self.send_packet(&message).await?;
+
+        loop {
+            let size = self.read_stream.read_var_int().await?;
+            let rest_reader = &mut self.read_stream.clone().take(*size as u64);
+            let packet_id = rest_reader.read_var_int().await?;
+
+            match packet_id {
+                InChatMessage::PACKET_ID => {
+                    let message = InChatMessage::parse(rest_reader).await?;
+                    self.world.broadcast_packet(&OutChatMessage::from(message)).await;
+                }
+                _ => {
+                    let mut buffer = Vec::new();
+                    rest_reader.read_to_end(&mut buffer).await?;
+                }
+            }
         }
 
-        let mut buf = Vec::new();
-        self.read_stream.read_to_end(&mut buf).await?;
-        dbg!(buf.len());
         Ok(())
     }
 }
