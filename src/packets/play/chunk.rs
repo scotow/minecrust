@@ -160,7 +160,7 @@ impl types::Size for Heightmap {
 impl types::Send for Heightmap {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
         let mut vec = Vec::with_capacity(*self.size() as usize);
-        Blob::from(self).to_writer(&mut vec);
+        Blob::from(self).to_writer(&mut vec)?;
         vec.send(writer).await
     }
 }
@@ -323,7 +323,6 @@ mod tests {
         let heightmap = Heightmap(BitArray::<Vec<_>>::from_slice(&ALL_4_HEIGHTMAP, 9));
         for z in 0..16 {
             for x in 0..16 {
-                dbg!((z, x));
                 assert_eq!(heightmap.get(x, z), 4);
             }
         }
