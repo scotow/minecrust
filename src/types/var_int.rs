@@ -7,6 +7,8 @@ use crate::types::{Send, Size};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::prelude::*;
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
 #[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, PartialEq, Eq, Hash)]
 pub struct VarInt(pub i32);
@@ -75,6 +77,13 @@ impl Deref for VarInt {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Display for VarInt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+        // write!(f, "{}", *self) // thread 'main' has overflowed its stack
     }
 }
 

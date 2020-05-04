@@ -4,6 +4,7 @@ use crate::types::{VarInt, Chat};
 use futures::AsyncRead;
 use anyhow::Result;
 use crate::stream::ReadExtension;
+use crate::game::player::Player;
 
 pub struct InChatMessage(types::String);
 
@@ -29,6 +30,13 @@ impl OutChatMessage {
             content,
             position,
         }
+    }
+
+    pub fn from_player_message(from: &Player, message: InChatMessage) -> Self {
+        Self::new(
+            Chat::user_message(&from.id().to_string(), &message.0),
+            Position::Chat,
+        )
     }
 }
 

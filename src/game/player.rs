@@ -116,8 +116,9 @@ impl Player {
 
             match packet_id {
                 InChatMessage::PACKET_ID => {
-                    let message = InChatMessage::parse(rest_reader).await?;
-                    self.world.broadcast_packet(&OutChatMessage::from(message)).await;
+                    let in_message = InChatMessage::parse(rest_reader).await?;
+                    let out_message = OutChatMessage::from_player_message(&self, in_message);
+                    self.world.broadcast_packet(&out_message).await;
                 }
                 _ => {
                     let mut buffer = Vec::new();

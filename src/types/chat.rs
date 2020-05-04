@@ -1,25 +1,28 @@
 use crate::types;
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
-pub struct Chat {
-    content: types::String
-}
+pub struct Chat(types::String);
 
 impl Chat {
     pub fn new(message: &str) -> Self {
         let content = serde_json::json!({
-            "translate": "chat.type.announcement",
+            "text": message
+        }).to_string();
+        Self(content.into())
+    }
+
+    pub fn user_message(sender: &str, message: &str) -> Self {
+        let content = serde_json::json!({
+            "translate": "chat.type.text",
             "with": [
                 {
-                    "text": "Admin"
+                    "text": sender
                 },
                 {
                     "text": message
                 }
             ]
-        }).to_string().into();
-        Self {
-            content
-        }
+        }).to_string();
+        Self(content.into())
     }
 }
