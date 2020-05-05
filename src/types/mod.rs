@@ -5,6 +5,7 @@ pub mod var_int;
 pub mod prefix;
 pub mod bit_array;
 pub mod chat;
+pub mod position;
 
 pub use send::Send;
 pub use size::Size;
@@ -13,3 +14,4 @@ pub use var_int::*;
 pub use prefix::*;
 pub use bit_array::*;
 pub use chat::*;
+pub use position::*;

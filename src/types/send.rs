@@ -26,7 +26,7 @@ _impl_send_primitives!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
 
 #[macro_export]
 macro_rules! impl_send {
-    ($type:tt as $repr:tt) => {
+    ($type:tt $(as $repr:tt)+) => {
         #[async_trait::async_trait]
         impl $crate::types::Send for $type {
             async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(
@@ -35,17 +35,30 @@ macro_rules! impl_send {
             ) -> anyhow::Result<()> {
                 #[allow(unused_imports)]
                 use $crate::types::Send;
-                (*self as $repr).send(writer).await
+                (*self $(as $repr)+).send(writer).await
             }
         }
-    }; // ($type:tt) => {
-       //     #[async_trait::async_trait]
-       //     impl $crate::types::Send for $type {
-       //         async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
-       //             concat_idents!(writer.write_, $type)(*self).await
-       //         }
-       //     }
-       // };
+
+        #[async_trait::async_trait]
+        impl $crate::types::Send for &$type {
+            async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(
+                &self,
+                writer: &mut W,
+            ) -> anyhow::Result<()> {
+                #[allow(unused_imports)]
+                use $crate::types::Send;
+                (**self $(as $repr)+).send(writer).await
+            }
+        }
+    };
+    // ($type:tt) => {
+    //     #[async_trait::async_trait]
+    //     impl $crate::types::Send for $type {
+    //         async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
+    //             concat_idents!(writer.write_, $type)(*self).await
+    //         }
+    //     }
+    // };
 }
 
 #[async_trait]

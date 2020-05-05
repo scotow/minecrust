@@ -16,7 +16,7 @@ pub trait ReadExtension: AsyncRead + Unpin + Sized {
     async fn read_u16(&mut self) -> Result<u16> {
         let mut buff = [0; 2];
         self.read_exact(&mut buff).await?;
-        Ok(((buff[0] as u16) << 8) | buff[1] as u16)
+        Ok(u16::from_be_bytes(buff))
     }
 
     async fn read_u64(&mut self) -> Result<u64> {
@@ -35,6 +35,24 @@ pub trait ReadExtension: AsyncRead + Unpin + Sized {
 
     async fn read_i64(&mut self) -> Result<i64> {
         self.read_u64().await.map(|n| n as i64)
+    }
+
+    async fn read_f32(&mut self) -> Result<f32> {
+        let mut buff = [0; 4];
+        self.read_exact(&mut buff).await?;
+        Ok(f32::from_be_bytes(buff))
+    }
+
+    async fn read_f64(&mut self) -> Result<f64> {
+        let mut buff = [0; 8];
+        self.read_exact(&mut buff).await?;
+        Ok(f64::from_be_bytes(buff))
+    }
+
+    async fn read_bool(&mut self) -> Result<bool> {
+        let mut buff = [0; 1];
+        self.read_exact(&mut buff).await?;
+        Ok(buff[0] != 0)
     }
 
     async fn read_var_int(&mut self) -> Result<VarInt> {

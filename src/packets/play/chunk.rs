@@ -1,7 +1,5 @@
 use crate::types::{self, LengthVec, Size, VarInt, SizeVec, BitArray};
 use anyhow::Result;
-use bitvec::order::{Lsb0, Msb0};
-use bitvec::vec::BitVec;
 use futures::prelude::*;
 use std::collections::HashMap;
 use nbt::Blob;

@@ -16,8 +16,9 @@ anyhow = "*"
 macro_derive = { path = "macro_derive" }
 piper = "0.1.1"
 futures-timer = "3.0.2"
-bitvec = "0.17.4"
 hematite-nbt = "0.4.1"
+uuid = { version = "0.8.1", features = ["v3"] }
+md5 = "0.7"
 
 [dev-dependencies]
 futures-await-test = "0.3.0"

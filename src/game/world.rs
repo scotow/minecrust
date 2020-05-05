@@ -6,6 +6,8 @@ use piper::{Arc, Mutex, Receiver, Sender, Lock};
 use std::collections::HashMap;
 use std::time::Duration;
 use crate::packets::Packet;
+use crate::packets::play::player_info::{PlayerInfo, Action};
+use crate::packets::play::spawn_player::SpawnPlayer;
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Player>>,
@@ -35,9 +37,9 @@ impl World {
         };
         let add_player_loop = async {
             loop {
-                let player = player_receiver.recv().await.unwrap();
-                let id = player.id();
-                self.players.lock().await.insert(id, player);
+                self.add_player(
+                    player_receiver.recv().await.unwrap()
+                ).await;
             }
         };
 
@@ -52,5 +54,31 @@ impl World {
             player.send_packet(packet)
         });
         futures::future::join_all(iter).await;
+    }
+
+    async fn add_player(&self, mut player: Player) {
+        let new_player_info = PlayerInfo::new(Action::Add, vec![player.info()]);
+        self.broadcast_packet(&new_player_info).await;
+
+        let spawn_player = SpawnPlayer::new(&player);
+        self.broadcast_packet(&spawn_player).await;
+
+        // Insert player to global list.
+        let id = player.id();
+        self.players.lock().await.insert(id, player.clone());
+
+        // Send everybody else player info.
+        let mut players = self.players.lock().await;
+        let info = players.values_mut().map(|p| p.info()).collect::<Vec<_>>();
+        let all_players_info = PlayerInfo::new(Action::Add, info);
+        player.clone().send_packet(&all_players_info).await;
+        // player.clone().send_packet(&new_player_info).await;
+
+        // Spawn other players in new player game.
+        for other in players.values_mut() {
+            if other.id() == player.id() { continue }
+            let spawn_other = SpawnPlayer::new(&other);
+            player.send_packet(&spawn_other).await;
+        }
     }
 }

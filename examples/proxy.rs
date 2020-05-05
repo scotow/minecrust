@@ -73,8 +73,8 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
 
         // futures::io::copy(server.take((*size - *packet_id.size()) as u64), client).await?;
 
-        let server_to_client = vec![0x00, 0x01, 0x02, 0x22, 0x26, 0x36, 0x21, 0x0F];
-        let client_to_server = vec![0x00, 0x01, 0x02, 0x0F];
+        let server_to_client = vec![0x00, 0x01, 0x02, 0x0F, 0x21, 0x22, 0x26, 0x34, 0x36];
+        let client_to_server = vec![0x00, 0x01, 0x02, 0x0F, 0x11, 0x12, 0x13, 0x14];
 
         if (direction == Direction::ServerToClient && server_to_client.contains(&*packet_id)) ||
             (direction == Direction::ClientToServer && client_to_server.contains(&*packet_id)) {
@@ -82,7 +82,7 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
             writer.write_all(&packet).await?;
         }
 
-        if direction == Direction::ServerToClient && *packet_id == 0x0F {
+        if direction == Direction::ServerToClient && *packet_id == 0x34 {
             println!("{}: {:02X?}", direction, &packet);
         }
 

@@ -40,6 +40,7 @@ impl Default for JoinGame {
     }
 }
 
+// TODO: Move to own file.
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum GameMode {
