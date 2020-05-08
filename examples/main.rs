@@ -17,8 +17,8 @@ use piper::{Arc, Mutex};
 use std::time::Duration;
 
 fn main() -> ! {
-    let (world, new_player) = World::new();
-    let world: &'static mut World = Box::leak(Box::new(world));
+    let world = World::new();
+    let world: &'static World = Box::leak(Box::new(world));
 
     let mut server_description = ServerDescription::default();
     server_description.players = (1, 0);
@@ -42,12 +42,10 @@ fn main() -> ! {
             if player.is_none() {
                 continue;
             }
-            let mut player = Arc::new(player.unwrap());
+            let player = player.unwrap();
 
-            let new_player = new_player.clone();
             Task::spawn(async move {
-                new_player.send(player).await;
-                player.run().await;
+                world.add_player(player).await;
             })
             .detach();
         }

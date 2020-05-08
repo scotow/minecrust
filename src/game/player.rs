@@ -8,8 +8,8 @@ use crate::fsm::State;
 use crate::types::{self, VarInt, Chat, LengthVec, BoolOption, EntityPosition};
 use anyhow::Result;
 use futures::prelude::*;
-use piper::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use piper::{Arc, Lock, LockGuard};
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::packets::play::block::Block;
 use futures_timer::Delay;
 use crate::packets::play::chat_message::{OutChatMessage, InChatMessage};
@@ -23,14 +23,13 @@ use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, Ou
 use std::cell::{RefCell, Cell};
 
 /// here we use the Arc to get interior mutability
-// #[derive(Clone)] // TODO: Remove clone.
 pub struct Player {
-    read_stream: Arc<Mutex<Box<dyn AsyncRead + Send + Sync + Unpin>>>,
-    write_stream: Arc<Mutex<Box<dyn AsyncWrite + Send + Sync + Unpin>>>,
+    read_stream: Lock<Box<dyn AsyncRead + Send + Sync + Unpin>>,
+    write_stream: Lock<Box<dyn AsyncWrite + Send + Sync + Unpin>>,
     world: &'static World,
     id: types::VarInt,
-    info: Arc<Info>,
-    position: Arc<Mutex<EntityPosition>>,
+    info: Arc<Box<Info>>,
+    position: Lock<EntityPosition>,
 }
 
 impl Player {
@@ -52,12 +51,12 @@ impl Player {
                 state.next(&mut reader, &mut writer).await?;
                 let id = (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() % 1000) as i32;
                 return Ok(Some(Self {
-                    read_stream: Arc::new(Mutex::new(Box::new(reader))),
-                    write_stream: Arc::new(Mutex::new(Box::new(writer))),
+                    read_stream: Lock::new(Box::new(reader)),
+                    write_stream: Lock::new(Box::new(writer)),
                     world,
                     id: VarInt(id),
-                    info: Arc::new(Info::from_id(id)),
-                    position: Arc::new(Mutex::new(EntityPosition::at(0, 5, 0))),
+                    info: Arc::new(Box::new(Info::from_id(id))),
+                    position: Lock::new(EntityPosition::new(0., 5., 0., 0, 0)),
                 }));
             }
         }
@@ -71,34 +70,35 @@ impl Player {
         self.info.clone()
     }
 
-    pub fn position(&self) -> Arc<Mutex<EntityPosition>> {
-        self.position.clone()
+    /// return a LockGuard, drop it as soon as possible
+    pub async fn position(&self) -> LockGuard<EntityPosition> {
+        self.position.lock().await
     }
 
-    pub async fn send_packet(&mut self, packet: &(impl Packet + Sync)) -> Result<()> {
-        packet.send_packet(&mut self.write_stream).await?;
-        self.write_stream.flush().await?;
+    pub async fn send_packet(&self, packet: &(impl Packet + Sync)) -> Result<()> {
+        packet.send_packet(&mut *self.write_stream.lock().await).await?;
+        self.write_stream.lock().await.flush().await?;
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&self) -> Result<()> {
         let join_game = JoinGame::default();
-        join_game.send_packet(&mut self.write_stream).await?;
+        join_game.send_packet(&mut *self.write_stream.lock().await).await?;
         // early flush so the player can get in game faster
-        self.write_stream.flush().await?;
+        self.write_stream.lock().await.flush().await?;
 
-        let position = OutPlayerPositionLook::from(&*self.position.lock());
-        position.send_packet(&mut self.write_stream).await?;
-        self.write_stream.flush().await?;
+        let position = OutPlayerPositionLook::from(&*self.position.lock().await);
+        position.send_packet(&mut *self.write_stream.lock().await).await?;
+        self.write_stream.lock().await.flush().await?;
 
         for i in 0..=45 {
             let slot = Slot::empty(Window::Inventory, i);
-            slot.send_packet(&mut self.write_stream).await?;
+            slot.send_packet(&mut *self.write_stream.lock().await).await?;
         }
         HeldItemSlot::new(4)?
-            .send_packet(&mut self.write_stream)
+            .send_packet(&mut *self.write_stream.lock().await)
             .await?;
-        self.write_stream.flush().await?;
+        self.write_stream.lock().await.flush().await?;
 
         let mut chunk = Chunk::new(0, 0);
         for z in 0..16 {
@@ -115,8 +115,8 @@ impl Player {
             for z in -4..4 {
                 chunk.x = x;
                 chunk.z = z;
-                chunk.send_packet(&mut self.write_stream).await?;
-                self.write_stream.flush().await?;
+                chunk.send_packet(&mut *self.write_stream.lock().await).await?;
+                self.write_stream.lock().await.flush().await?;
             }
         }
 

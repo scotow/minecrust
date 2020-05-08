@@ -1,11 +1,8 @@
-use crate::types::{self, LengthVec, Size, VarInt, SizeVec, BitArray};
+use crate::types::{self, LengthVec, Size, VarInt, BitArray};
 use anyhow::Result;
 use futures::prelude::*;
-use std::collections::HashMap;
 use nbt::Blob;
-use std::fmt::Debug;
-use serde::export::Formatter;
-use std::fmt;
+use std::fmt::{self, Debug};
 use crate::{impl_size, impl_send};
 use std::ops::Add;
 use crate::packets::play::block::Block;

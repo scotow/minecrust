@@ -1,8 +1,9 @@
 use crate::game::player::Player;
+use anyhow::Result;
 use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
 use futures_timer::Delay;
-use piper::{Arc, Mutex, Receiver, Sender, Lock};
+use piper::{Lock, Arc};
 use std::collections::HashMap;
 use std::time::Duration;
 use crate::packets::Packet;
@@ -11,24 +12,17 @@ use crate::packets::play::spawn_player::SpawnPlayer;
 use crate::packets::play::destroy_entity::DestroyEntity;
 
 pub struct World {
-    players: Lock<HashMap<types::VarInt, Arc<Lock<Player>>>>,
-    player_receiver: Receiver<Arc<Player>>,
+    players: Lock<HashMap<types::VarInt, Arc<Player>>>,
 }
 
 impl World {
-    pub fn new() -> (Self, Sender<Arc<Player>>) {
-        let (sender, receiver) = piper::chan(1);
-        (
+    pub fn new() -> Self {
             Self {
                 players: Lock::new(HashMap::new()),
-                player_receiver: receiver,
-            },
-            sender,
-        )
+            }
     }
 
     pub async fn run(&self, heartbeat: Duration) {
-        let player_receiver = &self.player_receiver;
         let keep_alive_loop = async {
             loop {
                 Delay::new(heartbeat).await;
@@ -36,16 +30,9 @@ impl World {
                 self.broadcast_packet(&keep_alive_packet).await;
             }
         };
-        let add_player_loop = async {
-            loop {
-                self.add_player(
-                    player_receiver.recv().await.unwrap()
-                ).await;
-            }
-        };
 
         // Run forever.
-        let _ = futures::join!(keep_alive_loop, add_player_loop);
+        let _ = futures::join!(keep_alive_loop);
     }
 
     pub async fn broadcast_packet(&self, packet: &(impl Packet + Sync)) {

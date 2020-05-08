@@ -1,20 +1,20 @@
 use crate::types::{LengthVec, VarInt, Size, Send};
-use crate::game::player::{Player, Info};
+use crate::game::player::Info;
 use crate::types;
 use futures::AsyncWrite;
 use anyhow::Result;
 use crate::{impl_size, impl_packet};
 use piper::Arc;
 
-#[derive(Debug)]
-pub struct PlayerInfo {
+#[derive(Debug, macro_derive::Size, macro_derive::Send)]
+pub struct PlayerInfo<'a> {
     action: Action,
-    info: LengthVec<Arc<Info>>,
+    info: LengthVec<&'a Info>,
 }
-impl_packet!(PlayerInfo, 0x34);
+impl_packet!(PlayerInfo<'_>, 0x34);
 
-impl<'a> PlayerInfo {
-    pub fn new(action: Action, info: Vec<Arc<Info>>) -> Self {
+impl<'a> PlayerInfo<'a> {
+    pub fn new(action: Action, info: Vec<&'a Info>) -> Self {
         Self {
             action,
             info: LengthVec(info),
