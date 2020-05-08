@@ -13,5 +13,4 @@ pub use string::*;
 pub use var_int::*;
 pub use prefix::*;
 pub use bit_array::*;
-pub use chat::*;
 pub use position::*;

@@ -5,7 +5,7 @@ use crate::packets::play::{player_position::OutPlayerPositionLook, slot::{Slot, 
 use crate::packets::{Packet, ServerDescription};
 
 use crate::fsm::State;
-use crate::types::{self, VarInt, Chat, LengthVec, BoolOption, EntityPosition};
+use crate::types::{self, VarInt, LengthVec, BoolOption, EntityPosition};
 use anyhow::Result;
 use futures::prelude::*;
 use piper::{Arc, Lock, LockGuard};
@@ -22,6 +22,7 @@ use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRo
 use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
 use std::cell::{RefCell, Cell};
 use std::str::FromStr;
+use crate::types::chat::Chat;
 
 /// here we use the Arc to get interior mutability
 pub struct Player {

@@ -1,10 +1,11 @@
 use crate::types;
 use crate::{impl_packet, impl_size, impl_send};
-use crate::types::{VarInt, Chat};
+use crate::types::{VarInt};
 use futures::AsyncRead;
 use anyhow::Result;
 use crate::stream::ReadExtension;
 use crate::game::player::Player;
+use crate::types::chat::Chat;
 
 pub struct InChatMessage(types::String);
 
@@ -19,13 +20,13 @@ impl InChatMessage {
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct OutChatMessage {
-    content: types::Chat,
+    content: Chat,
     position: Position,
 }
 impl_packet!(OutChatMessage, 0x0F);
 
 impl OutChatMessage {
-    pub fn new(content: types::Chat, position: Position) -> Self {
+    pub fn new(content: Chat, position: Position) -> Self {
         Self {
             content,
             position,

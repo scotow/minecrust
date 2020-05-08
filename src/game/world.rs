@@ -12,7 +12,7 @@ use crate::packets::play::spawn_player::SpawnPlayer;
 use crate::packets::play::destroy_entity::DestroyEntity;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::chat_message::{OutChatMessage, Position};
-use crate::types::Chat;
+use crate::types::chat::{Chat, ChatBuilder, ChatComponent, Attribute, Color};
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Arc<Player>>>,
