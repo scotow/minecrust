@@ -19,7 +19,7 @@ use uuid::Uuid;
 use futures::AsyncWriteExt;
 use std::cmp::min;
 use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, InPlayerRotation};
-use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation};
+use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
 use std::cell::{RefCell, Cell};
 
 /// here we use the Arc to get interior mutability
@@ -28,7 +28,7 @@ pub struct Player {
     write_stream: Lock<Box<dyn AsyncWrite + Send + Sync + Unpin>>,
     world: &'static World,
     id: types::VarInt,
-    info: Arc<Box<Info>>,
+    info: Info,
     position: Lock<EntityPosition>,
 }
 
@@ -55,7 +55,7 @@ impl Player {
                     write_stream: Lock::new(Box::new(writer)),
                     world,
                     id: VarInt(id),
-                    info: Arc::new(Box::new(Info::from_id(id))),
+                    info: Info::from_id(id),
                     position: Lock::new(EntityPosition::new(0., 5., 0., 0, 0)),
                 }));
             }
@@ -66,8 +66,8 @@ impl Player {
         self.id
     }
 
-    pub fn info(&self) -> Arc<Info> {
-        self.info.clone()
+    pub fn info(&self) -> &Info {
+        &self.info
     }
 
     /// return a LockGuard, drop it as soon as possible
@@ -82,11 +82,6 @@ impl Player {
     }
 
     pub async fn run(&self) -> Result<()> {
-        let join_game = JoinGame::default();
-        join_game.send_packet(&mut *self.write_stream.lock().await).await?;
-        // early flush so the player can get in game faster
-        self.write_stream.lock().await.flush().await?;
-
         let position = OutPlayerPositionLook::from(&*self.position.lock().await);
         position.send_packet(&mut *self.write_stream.lock().await).await?;
         self.write_stream.lock().await.flush().await?;
@@ -132,46 +127,53 @@ impl Player {
         Ok(())
     }
 
-    async fn handle_packet(&mut self) -> Result<()> {
-        // loop {
-        //     let size = self.read_stream.read_var_int().await?;
-        //     let rest_reader = &mut self.read_stream.clone().take(*size as u64);
-        //     let packet_id = rest_reader.read_var_int().await?;
-        //
-        //     match packet_id {
-        //         InChatMessage::PACKET_ID => {
-        //             let in_message = InChatMessage::parse(rest_reader).await?;
-        //             let out_message = OutChatMessage::from_player_message(&self, in_message);
-        //             self.world.broadcast_packet(&out_message).await;
-        //         },
-        //         InPlayerPosition::PACKET_ID => {
-        //             let in_position = InPlayerPosition::parse(rest_reader).await?;
-        //             let delta = self.position.update_position(&in_position);
-        //
-        //             let out_position = OutPosition::from(&self, &delta, in_position.on_ground);
-        //             self.world.broadcast_packet_except(&out_position, &self).await;
-        //         },
-        //         InPlayerPositionRotation::PACKET_ID => {
-        //             let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
-        //             let delta = self.position.update_position(&in_position_rotation);
-        //             self.position.update_angle(&in_position_rotation);
-        //
-        //             let out_position_rotation = OutPositionRotation::from(&self, &delta, in_position_rotation.on_ground);
-        //             self.world.broadcast_packet_except(&out_position_rotation, &self).await;
-        //         },
-        //         InPlayerRotation::PACKET_ID => {
-        //             let in_rotation = InPlayerRotation::parse(rest_reader).await?;
-        //             self.position.update_angle(&in_rotation);
-        //
-        //             let out_rotation = OutRotation::from(&self, in_rotation.on_ground);
-        //             self.world.broadcast_packet_except(&out_rotation, &self).await;
-        //         },
-        //         _ => {
-        //             let _error = futures::io::copy(rest_reader, &mut futures::io::sink()).await;
-        //             print!("{} ", packet_id);
-        //         }
-        //     }
-        // }
+    async fn handle_packet(&self) -> Result<()> {
+        loop {
+            let size = self.read_stream.lock().await.read_var_int().await?;
+            let rest_reader = &mut *self.read_stream.lock().await;
+            let rest_reader = &mut rest_reader.take(*size as u64);
+            let packet_id = rest_reader.read_var_int().await?;
+
+            match packet_id {
+                InChatMessage::PACKET_ID => {
+                    let in_message = InChatMessage::parse(rest_reader).await?;
+                    let out_message = OutChatMessage::from_player_message(&self, in_message);
+                    self.world.broadcast_packet(&out_message).await;
+                },
+                InPlayerPosition::PACKET_ID => {
+                    let in_position = InPlayerPosition::parse(rest_reader).await?;
+                    let delta = self.position.lock().await.update_position(&in_position);
+
+                    let out_position = OutPosition::from(&self, &delta, in_position.on_ground);
+                    self.world.broadcast_packet_except(&out_position, &self).await;
+                },
+                InPlayerPositionRotation::PACKET_ID => {
+                    let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
+                    let delta = self.position.lock().await.update_position(&in_position_rotation);
+                    self.position.lock().await.update_angle(&in_position_rotation);
+
+                    let out_position_rotation = OutPositionRotation::from(&self, &delta, in_position_rotation.on_ground).await;
+                    self.world.broadcast_packet_except(&out_position_rotation, &self).await;
+
+                    let out_head_look = OutEntityHeadLook::from(&self).await;
+                    self.world.broadcast_packet_except(&out_head_look, &self).await;
+                },
+                InPlayerRotation::PACKET_ID => {
+                    let in_rotation = InPlayerRotation::parse(rest_reader).await?;
+                    self.position.lock().await.update_angle(&in_rotation);
+
+                    let out_rotation = OutRotation::from(&self, in_rotation.on_ground).await;
+                    self.world.broadcast_packet_except(&out_rotation, &self).await;
+
+                    let out_head_look = OutEntityHeadLook::from(&self).await;
+                    self.world.broadcast_packet_except(&out_head_look, &self).await;
+                },
+                _ => {
+                    let _error = futures::io::copy(rest_reader, &mut futures::io::sink()).await;
+                    print!("{} ", packet_id);
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -207,6 +209,10 @@ impl Info {
 
     pub fn uuid(&self) -> Uuid {
         self.uuid
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 

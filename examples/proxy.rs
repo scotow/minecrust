@@ -8,6 +8,16 @@ use smol::{Async, Task};
 use std::net::{TcpListener, TcpStream};
 use std::fmt::Display;
 use serde::export::Formatter;
+use minecrust::packets::Handshake;
+use minecrust::packets::play::chat_message::OutChatMessage;
+use minecrust::packets::play::join_game::JoinGame;
+use minecrust::packets::play::player_info::PlayerInfo;
+use minecrust::packets::play::player_position::{OutPlayerPositionLook, InPlayerPosition, InPlayerPositionRotation, InPlayerRotation};
+use minecrust::packets::play::spawn_player::SpawnPlayer;
+use minecrust::packets::play::keep_alive::KeepAlive;
+use minecrust::packets::play::chunk::Chunk;
+use minecrust::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
+use minecrust::packets::play::destroy_entity::DestroyEntity;
 
 fn main() {
     let listener = Async::<TcpListener>::bind("127.0.0.1:25566").unwrap();
@@ -73,8 +83,34 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
 
         // futures::io::copy(server.take((*size - *packet_id.size()) as u64), client).await?;
 
-        let server_to_client = vec![0x00, 0x01, 0x02, 0x0F, 0x21, 0x22, 0x26, 0x34, 0x36];
-        let client_to_server = vec![0x00, 0x01, 0x02, 0x0F, 0x11, 0x12, 0x13, 0x14];
+        use minecrust::packets::Packet;
+        use minecrust::packets::*;
+
+        let server_to_client = vec![
+            0x00, *Handshake::PACKET_ID, *StatusRequest::PACKET_ID,
+            0x01, *Ping::PACKET_ID,
+            0x02, *LoginRequest::SUCCESS_PACKET_ID,
+            0x05, *SpawnPlayer::PACKET_ID,
+            0x0F, *OutChatMessage::PACKET_ID,
+            0x21, *KeepAlive::PACKET_ID,
+            0x22, *Chunk::PACKET_ID,
+            0x26, *JoinGame::PACKET_ID,
+            0x29, *OutPosition::PACKET_ID,
+            0x2A, *OutPositionRotation::PACKET_ID,
+            0x2B, *OutRotation::PACKET_ID,
+            0x34, *PlayerInfo::PACKET_ID,
+            0x36, *OutPlayerPositionLook::PACKET_ID,
+            0x38, *DestroyEntity::PACKET_ID,
+            0x3C, *OutEntityHeadLook::PACKET_ID
+        ];
+        let client_to_server = vec![
+            0x00, *StatusRequest::PACKET_ID,
+            0x01, *Ping::PACKET_ID,
+            0x0F, /*Keep Alive*/
+            0x11, *InPlayerPosition::PACKET_ID,
+            0x12, *InPlayerPositionRotation::PACKET_ID,
+            0x13, *InPlayerRotation::PACKET_ID
+        ];
 
         if (direction == Direction::ServerToClient && server_to_client.contains(&*packet_id)) ||
             (direction == Direction::ClientToServer && client_to_server.contains(&*packet_id)) {
@@ -82,9 +118,9 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
             writer.write_all(&packet).await?;
         }
 
-        if direction == Direction::ServerToClient && *packet_id == 0x34 {
-            println!("{}: {:02X?}", direction, &packet);
-        }
+        // if direction == Direction::ServerToClient && *packet_id == 0x34 {
+        //     println!("{}: {:02X?}", direction, &packet);
+        // }
 
         // let mut first = true;
         // if *packet_id == 0x22 && first {

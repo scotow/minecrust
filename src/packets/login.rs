@@ -11,10 +11,10 @@ pub struct LoginRequest {
 }
 
 impl LoginRequest {
-    const START_PACKET_ID: types::VarInt = types::VarInt(0x00);
-    const START_MAX_SIZE: types::VarInt = types::VarInt(1 + 4 * 16 + 1);
+    pub const START_PACKET_ID: types::VarInt = types::VarInt(0x00);
+    pub const SUCCESS_PACKET_ID: types::VarInt = types::VarInt(0x02);
 
-    const SUCCESS_PACKET_ID: types::VarInt = types::VarInt(0x02);
+    const START_MAX_SIZE: types::VarInt = types::VarInt(1 + 4 * 16 + 1);
     const RANDOM_UUID: &'static str = "cbc2619b-9c6b-4171-a51d-abc281d6ff38";
 
     pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {

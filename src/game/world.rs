@@ -10,6 +10,9 @@ use crate::packets::Packet;
 use crate::packets::play::player_info::{PlayerInfo, Action};
 use crate::packets::play::spawn_player::SpawnPlayer;
 use crate::packets::play::destroy_entity::DestroyEntity;
+use crate::packets::play::join_game::JoinGame;
+use crate::packets::play::chat_message::{OutChatMessage, Position};
+use crate::types::Chat;
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Arc<Player>>>,
@@ -17,9 +20,9 @@ pub struct World {
 
 impl World {
     pub fn new() -> Self {
-            Self {
-                players: Lock::new(HashMap::new()),
-            }
+        Self {
+            players: Lock::new(HashMap::new()),
+        }
     }
 
     pub async fn run(&self, heartbeat: Duration) {
@@ -47,39 +50,52 @@ impl World {
     pub async fn broadcast_packet_except(&self, packet: &(impl Packet + Sync), except: &Player) {
         let mut players = self.players.lock().await;
         let iter = players.values_mut()
-            .filter(|player| player.id() != except.id())
+            .filter(|player| &***player != except)
             .map(|player| { player.send_packet(packet) });
 
         futures::future::join_all(iter).await;
     }
 
-    async fn add_player(&self, mut player: Arc<Player>) {
+    pub async fn add_player(&self, mut player: Player) {
+        let player = Arc::new(player);
         let id = player.id();
-        let player_info = player.info().clone();
-        let mut players = self.players.lock().await;
 
-        // Player info.
+        // Insert player to global map.
+        self.players.lock().await.insert(id, Arc::clone(&player));
+
+        let join_game = JoinGame::default();
+        player.send_packet(&join_game).await;
+
+        // Send all players info to the new player.
+        {
+            let mut players = self.players.lock().await;
+            let mut all_info = players.values_mut().map(|p| p.info()).collect::<Vec<_>>();
+            let all_players_info = PlayerInfo::new(Action::Add, all_info);
+            player.send_packet(&all_players_info).await;
+        }
+
+        // Send the new player info to everybody else.
         let new_player_info = PlayerInfo::new(Action::Add, vec![player.info()]);
-        self.broadcast_packet(&new_player_info).await;
+        self.broadcast_packet_except(&new_player_info, &player).await;
 
-        let mut all_info = players.values_mut().map(|p| p.info()).collect::<Vec<_>>();
-        all_info.push(player.info());
-        let all_players_info = PlayerInfo::new(Action::Add, all_info);
-        player.send_packet(&all_players_info).await;
+        // Spawn the new player in everybody else game.
+        let spawn_player = SpawnPlayer::new(&player).await;
+        self.broadcast_packet_except(&spawn_player, &player).await;
 
-        // Player spawn.
-        let spawn_player = SpawnPlayer::new(&player);
-        self.broadcast_packet(&spawn_player).await;
-
-        // Spawn other players in new player game.
-        for other in players.values_mut() {
-            if other.id() == player.id() { continue }
-            let spawn_other = SpawnPlayer::new(&other);
+        // Spawn other players in the new player game.
+        for other in self.players.lock().await.values_mut()
+            .filter(|other| &***other != &*player) {
+            let spawn_other = SpawnPlayer::new(&other).await;
             player.send_packet(&spawn_other).await;
         }
 
-        // Insert player to global list.
-        self.players.lock().await.insert(id, player);
+        let announcement = OutChatMessage::new(
+            Chat::player_joined(&player.info().name()),
+            Position::SystemMessage,
+        );
+        self.broadcast_packet_except(&announcement, &player).await;
+
+        player.run().await;
     }
 
     pub async fn remove_player(&self, player: &Player) {
@@ -91,5 +107,11 @@ impl World {
 
         let info = PlayerInfo::new(Action::Remove, vec![player.info()]);
         self.broadcast_packet(&info).await;
+
+        let announcement = OutChatMessage::new(
+            Chat::player_left(&player.info().name()),
+            Position::SystemMessage,
+        );
+        self.broadcast_packet(&announcement).await;
     }
 }

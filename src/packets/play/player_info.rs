@@ -6,7 +6,7 @@ use anyhow::Result;
 use crate::{impl_size, impl_packet};
 use piper::Arc;
 
-#[derive(Debug, macro_derive::Size, macro_derive::Send)]
+#[derive(Debug)]
 pub struct PlayerInfo<'a> {
     action: Action,
     info: LengthVec<&'a Info>,
@@ -22,7 +22,7 @@ impl<'a> PlayerInfo<'a> {
     }
 }
 
-impl Size for PlayerInfo {
+impl<'a> Size for PlayerInfo<'a> {
     fn size(&self) -> VarInt {
         self.action.size() +
             match self.action {
@@ -39,7 +39,7 @@ impl Size for PlayerInfo {
 }
 
 #[async_trait::async_trait]
-impl Send for PlayerInfo {
+impl<'a> Send for PlayerInfo<'a> {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
         self.action.send(writer).await?;
         match self.action {

@@ -13,7 +13,7 @@ use serde_json::json;
 pub struct StatusRequest {}
 
 impl StatusRequest {
-    const PACKET_ID: types::VarInt = types::VarInt(0x00);
+    pub const PACKET_ID: types::VarInt = types::VarInt(0x00);
 
     pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
         let size = reader.read_var_int().await?;
