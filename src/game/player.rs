@@ -21,6 +21,7 @@ use std::cmp::min;
 use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, InPlayerRotation};
 use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
 use std::cell::{RefCell, Cell};
+use std::str::FromStr;
 
 /// here we use the Arc to get interior mutability
 pub struct Player {
@@ -188,7 +189,7 @@ impl PartialEq for Player {
 pub struct Info {
     uuid: Uuid,
     name: types::String,
-    properties: LengthVec<u8>,
+    properties: LengthVec<InfoProperty>,
     game_mode: GameMode,
     ping: VarInt,
     display_name: BoolOption<Chat>,
@@ -213,6 +214,23 @@ impl Info {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+}
+
+#[derive(Debug, macro_derive::Size, macro_derive::Send)]
+struct InfoProperty {
+    name: types::String,
+    value: types::String,
+    signed: bool,
+}
+
+impl InfoProperty {
+    pub fn new_texture(path: &str) -> Self {
+        Self {
+            name: types::String::new("textures"),
+            value: types::String::new(std::str::from_utf8(&std::fs::read(path).unwrap()).unwrap()),
+            signed: false,
+        }
     }
 }
 
