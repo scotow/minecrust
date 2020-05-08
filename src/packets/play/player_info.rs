@@ -1,5 +1,5 @@
 use crate::types::{LengthVec, VarInt};
-use crate::game::player::{Player, Info};
+use crate::game::player::Info;
 use crate::types;
 use futures::AsyncWrite;
 use anyhow::Result;

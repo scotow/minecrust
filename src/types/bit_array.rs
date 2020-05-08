@@ -1,7 +1,7 @@
 use std::ops::{Index, IndexMut, Deref};
 use crate::types::{LengthVec, Size, VarInt, Send};
 use futures::AsyncWrite;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct BitArray<T> {

@@ -43,8 +43,8 @@ pub struct OutPosition {
 impl_packet!(OutPosition, 0x29);
 
 impl OutPosition {
-    pub fn from_player_position(player: &Player, new: &InPlayerPosition) -> Self {
-        let current_position = player.position();
+    pub async fn from_player_position(player: &Player, new: &InPlayerPosition) -> Self {
+        let current_position = player.position().await;
         Self {
             id: player.id(),
             delta_x: (new.x * 32. - current_position.x * 32.) as i16 * 128,
@@ -54,8 +54,8 @@ impl OutPosition {
         }
     }
 
-    pub fn from_player_position_rotation(player: &Player, new: &InPlayerPositionRotation) -> Self {
-        let current_position = player.position();
+    pub async fn from_player_position_rotation(player: &Player, new: &InPlayerPositionRotation) -> Self {
+        let current_position = player.position().await;
         Self {
             id: player.id(),
             delta_x: (new.x * 32. - current_position.x * 32.) as i16 * 128,
