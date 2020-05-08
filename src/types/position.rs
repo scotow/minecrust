@@ -1,4 +1,4 @@
-use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation};
+use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, PlayerPositionPacket, PlayerRotationPacket};
 
 #[derive(Debug, Clone, macro_derive::Size, macro_derive::Send)]
 pub struct EntityPosition {
@@ -20,17 +20,27 @@ impl EntityPosition {
         }
     }
 
-    pub fn update_from_position(&mut self, position: &InPlayerPosition) {
-        self.x = position.x;
-        self.y = position.y;
-        self.z = position.z;
+    pub fn at(x: i64, y: i64, z: i64) -> Self {
+        Self::new(x as f64, y as f64, z as f64, 0, 0)
     }
 
-    pub fn update_from_position_rotation(&mut self, position: &InPlayerPositionRotation) {
-        self.x = position.x;
-        self.y = position.y;
-        self.z = position.z;
-        self.x_angle = position.x_angle as u8;
-        self.z_angle = position.z_angle as u8;
+    pub fn update_position(&mut self, from: &dyn PlayerPositionPacket) -> PositionDelta {
+        let delta = PositionDelta(
+            ((from.x() * 32. - self.x * 32.) * 128.) as i16,
+            ((from.y() * 32. - self.y * 32.) * 128.) as i16,
+            ((from.z() * 32. - self.z * 32.) * 128.) as i16,
+        );
+        self.x = from.x();
+        self.y = from.y();
+        self.z = from.z();
+
+        delta
+    }
+
+    pub fn update_angle(&mut self, from: &dyn PlayerRotationPacket) {
+        self.x_angle = ((from.x_angle() % 360. + 360.) % 360. * 255. / 360.) as u8;
+        self.z_angle = ((from.z_angle() % 360. + 360.) % 360. * 255. / 360.) as u8;
     }
 }
+
+pub struct PositionDelta(pub i16, pub i16, pub i16);

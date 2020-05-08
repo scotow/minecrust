@@ -1,6 +1,7 @@
 use crate::types;
 use crate::types::VarInt;
 use std::ops::Add;
+use piper::{Arc, Mutex};
 
 pub trait Size {
     fn size(&self) -> types::VarInt;
@@ -41,6 +42,18 @@ impl<T: Size> Size for Option<T> {
 impl<T: Size> Size for Vec<T> {
     fn size(&self) -> VarInt {
         self.iter().map(Size::size).fold(VarInt::new(0), Add::add)
+    }
+}
+
+impl<T: Size> Size for Arc<T> {
+    fn size(&self) -> VarInt {
+        self.size()
+    }
+}
+
+impl<T: Size> Size for Mutex<T> {
+    fn size(&self) -> VarInt {
+        self.lock().size()
     }
 }
 

@@ -42,11 +42,11 @@ fn main() -> ! {
             if player.is_none() {
                 continue;
             }
-            let mut player = player.unwrap();
+            let mut player = Arc::new(player.unwrap());
 
             let new_player = new_player.clone();
             Task::spawn(async move {
-                new_player.send(player.clone()).await;
+                new_player.send(player).await;
                 player.run().await;
             })
             .detach();

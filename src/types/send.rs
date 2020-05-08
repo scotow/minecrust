@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::prelude::*;
 use futures::AsyncWriteExt;
+use piper::{Arc, Mutex};
 
 #[async_trait]
 pub trait Send {
@@ -86,5 +87,19 @@ impl<T: Send + Sync> Send for Vec<T> {
             i.send(writer).await?;
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<T: Send + Sync + std::marker::Send> Send for Arc<T> {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        self.send(writer).await
+    }
+}
+
+#[async_trait]
+impl<T: Send + Sync + std::marker::Send> Send for Mutex<T> {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        self.lock().send(writer).await
     }
 }

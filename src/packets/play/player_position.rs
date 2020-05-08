@@ -32,40 +32,18 @@ impl From<&EntityPosition> for OutPlayerPositionLook {
     }
 }
 
-#[derive(Debug, macro_derive::Size, macro_derive::Send)]
-pub struct OutPosition {
-    id: VarInt,
-    delta_x: i16,
-    delta_y: i16,
-    delta_z: i16,
-    on_ground: bool,
-}
-impl_packet!(OutPosition, 0x29);
-
-impl OutPosition {
-    pub fn from_player_position(player: &Player, new: &InPlayerPosition) -> Self {
-        let current_position = player.position();
-        Self {
-            id: player.id(),
-            delta_x: (new.x * 32. - current_position.x * 32.) as i16 * 128,
-            delta_y: (new.y * 32. - current_position.y * 32.) as i16 * 128,
-            delta_z: (new.z * 32. - current_position.z * 32.) as i16 * 128,
-            on_ground: new.on_ground,
-        }
-    }
-
-    pub fn from_player_position_rotation(player: &Player, new: &InPlayerPositionRotation) -> Self {
-        let current_position = player.position();
-        Self {
-            id: player.id(),
-            delta_x: (new.x * 32. - current_position.x * 32.) as i16 * 128,
-            delta_y: (new.y * 32. - current_position.y * 32.) as i16 * 128,
-            delta_z: (new.z * 32. - current_position.z * 32.) as i16 * 128,
-            on_ground: new.on_ground,
-        }
-    }
+pub trait PlayerPositionPacket {
+    fn x(&self) -> f64;
+    fn y(&self) -> f64;
+    fn z(&self) -> f64;
 }
 
+pub trait PlayerRotationPacket {
+    fn x_angle(&self) -> f32;
+    fn z_angle(&self) -> f32;
+}
+
+#[derive(Debug)]
 pub struct InPlayerPosition {
     pub x: f64,
     pub y: f64,
@@ -90,6 +68,13 @@ impl InPlayerPosition {
     }
 }
 
+impl PlayerPositionPacket for InPlayerPosition {
+    fn x(&self) -> f64 { self.x }
+    fn y(&self) -> f64 { self.y }
+    fn z(&self) -> f64 { self.z }
+}
+
+#[derive(Debug)]
 pub struct InPlayerPositionRotation {
     pub x: f64,
     pub y: f64,
@@ -118,4 +103,42 @@ impl InPlayerPositionRotation {
             on_ground,
         })
     }
+}
+
+impl PlayerPositionPacket for InPlayerPositionRotation {
+    fn x(&self) -> f64 { self.x }
+    fn y(&self) -> f64 { self.y }
+    fn z(&self) -> f64 { self.z }
+}
+
+impl PlayerRotationPacket for InPlayerPositionRotation {
+    fn x_angle(&self) -> f32 { self.x_angle }
+    fn z_angle(&self) -> f32 { self.z_angle }
+}
+
+#[derive(Debug)]
+pub struct InPlayerRotation {
+    pub x_angle: f32,
+    pub z_angle: f32,
+    pub on_ground: bool,
+}
+
+impl InPlayerRotation {
+    pub const PACKET_ID: VarInt = VarInt(0x13);
+
+    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
+        let x_angle = reader.read_f32().await?;
+        let z_angle = reader.read_f32().await?;
+        let on_ground = reader.read_bool().await?;
+        Ok(Self {
+            x_angle,
+            z_angle,
+            on_ground,
+        })
+    }
+}
+
+impl PlayerRotationPacket for InPlayerRotation {
+    fn x_angle(&self) -> f32 { self.x_angle }
+    fn z_angle(&self) -> f32 { self.z_angle }
 }
