@@ -45,18 +45,6 @@ impl<T: Size> Size for Vec<T> {
     }
 }
 
-impl<T: Size> Size for Arc<T> {
-    fn size(&self) -> VarInt {
-        self.size()
-    }
-}
-
-impl<T: Size> Size for Mutex<T> {
-    fn size(&self) -> VarInt {
-        self.lock().size()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

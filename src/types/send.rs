@@ -89,17 +89,3 @@ impl<T: Send + Sync> Send for Vec<T> {
         Ok(())
     }
 }
-
-#[async_trait]
-impl<T: Send + Sync + std::marker::Send> Send for Arc<T> {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        self.send(writer).await
-    }
-}
-
-#[async_trait]
-impl<T: Send + Sync + std::marker::Send> Send for Mutex<T> {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-        self.lock().send(writer).await
-    }
-}
