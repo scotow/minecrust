@@ -23,6 +23,7 @@ use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, Ou
 use std::cell::{RefCell, Cell};
 use std::str::FromStr;
 use crate::types::chat::Chat;
+use std::collections::HashSet;
 
 /// here we use the Arc to get interior mutability
 pub struct Player {
@@ -32,6 +33,7 @@ pub struct Player {
     id: types::VarInt,
     info: Info,
     position: Lock<EntityPosition>,
+    loaded_chunks: Lock<HashSet<(i32, i32)>>
 }
 
 impl Player {
@@ -59,6 +61,7 @@ impl Player {
                     id: VarInt(id),
                     info: Info::from_id(id),
                     position: Lock::new(EntityPosition::new(0., 5., 0., 0, 0)),
+                    loaded_chunks: Lock::new(HashSet::new())
                 }));
             }
         }
@@ -72,7 +75,6 @@ impl Player {
         &self.info
     }
 
-    /// return a LockGuard, drop it as soon as possible
     pub async fn position(&self) -> LockGuard<EntityPosition> {
         self.position.lock().await
     }
@@ -97,25 +99,7 @@ impl Player {
             .await?;
         self.write_stream.lock().await.flush().await?;
 
-        let mut chunk = Chunk::new(0, 0);
-        for z in 0..16 {
-            for x in 0..16 {
-                if (z + x) % 2 == 0 {
-                    chunk.set_block(x, 4, z, Block::WhiteConcrete);
-                } else {
-                    chunk.set_block(x, 4, z, Block::BlackConcrete);
-                }
-            }
-        }
-
-        for x in -4..4 {
-            for z in -4..4 {
-                chunk.x = x;
-                chunk.z = z;
-                chunk.send_packet(&mut *self.write_stream.lock().await).await?;
-                self.write_stream.lock().await.flush().await?;
-            }
-        }
+        self.send_chunks_around(2).await;
 
         let message = OutChatMessage::new(
             Chat::new("Welcome in Minecrust!"),
@@ -123,10 +107,27 @@ impl Player {
         );
         self.send_packet(&message).await?;
 
+        // futures::join!(self.send_chunks_around(16), self.handle_packet());
+        self.send_chunks_around(16).await;
+
         if let Some(error) = self.handle_packet().await.err() {
             self.world.remove_player(&self).await;
         }
         Ok(())
+    }
+
+    async fn send_chunks_around(&self, range: i32) {
+        for r in 0..range {
+            for z in -r..r {
+                for x in -r..r {
+                    if !self.loaded_chunks.lock().await.insert((x, z)) { continue }
+
+                    let mut chunk = self.world.map.chunk(x, z).await;
+                    chunk.send_packet(&mut *self.write_stream.lock().await).await;
+                    self.write_stream.lock().await.flush().await;
+                }
+            }
+        }
     }
 
     async fn handle_packet(&self) -> Result<()> {

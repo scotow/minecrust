@@ -7,7 +7,9 @@ pub enum Block {
     Grass = 9,
     Water = 49,
     Lava = 50,
+    SlimeBlock = 6999,
     WhiteConcrete = 8902,
+    RedConcrete = 8916,
     BlackConcrete = 8917,
     HoneyBlock = 11335,
 }

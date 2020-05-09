@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
 use futures_timer::Delay;
-use piper::{Lock, Arc};
+use piper::{Lock, Arc, LockGuard};
 use std::collections::HashMap;
 use std::time::Duration;
 use crate::packets::Packet;
@@ -13,15 +13,20 @@ use crate::packets::play::destroy_entity::DestroyEntity;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::chat_message::{OutChatMessage, Position};
 use crate::types::chat::{Chat, ChatBuilder, ChatComponent, Attribute, Color};
+use crate::packets::play::chunk::Chunk;
+use crate::packets::play::block::Block;
+use crate::game::map::Map;
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Arc<Player>>>,
+    pub map: Map,
 }
 
 impl World {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         Self {
             players: Lock::new(HashMap::new()),
+            map: Map::new().await,
         }
     }
 

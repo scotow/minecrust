@@ -38,8 +38,8 @@ impl EntityPosition {
     }
 
     pub fn update_angle(&mut self, from: &dyn PlayerRotationPacket) {
-        self.x_angle = ((from.x_angle() % 360. + 360.) % 360. * 255. / 360.) as u8;
-        self.z_angle = ((from.z_angle() % 360. + 360.) % 360. * 255. / 360.) as u8;
+        self.x_angle = (from.x_angle().rem_euclid(360.) * 255. / 360.) as u8;
+        self.z_angle = (from.z_angle().rem_euclid(360.) * 255. / 360.) as u8;
     }
 }
 

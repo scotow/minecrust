@@ -17,7 +17,9 @@ use piper::{Arc, Mutex};
 use std::time::Duration;
 
 fn main() -> ! {
-    let world = World::new();
+    let world = smol::block_on(World::new());
+    eprintln!("World map generated.");
+
     let world: &'static World = Box::leak(Box::new(world));
 
     let mut server_description = ServerDescription::default();
