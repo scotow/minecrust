@@ -99,8 +99,6 @@ impl Player {
             .await?;
         self.write_stream.lock().await.flush().await?;
 
-        self.send_chunks_around(2).await;
-
         let message = OutChatMessage::new(
             Chat::new("Welcome in Minecrust!"),
             chat_message::Position::GameInfo,
@@ -108,26 +106,22 @@ impl Player {
         self.send_packet(&message).await?;
 
         // futures::join!(self.send_chunks_around(16), self.handle_packet());
-        self.send_chunks_around(16).await;
-
-        if let Some(error) = self.handle_packet().await.err() {
-            self.world.remove_player(&self).await;
-        }
-        Ok(())
+        self.send_chunks_around(16).await?;
+        self.handle_packet().await
     }
 
-    async fn send_chunks_around(&self, range: i32) {
+    async fn send_chunks_around(&self, range: i32) -> Result<()> {
         for r in 0..range {
             for z in -r..r {
                 for x in -r..r {
                     if !self.loaded_chunks.lock().await.insert((x, z)) { continue }
 
-                    let mut chunk = self.world.map.chunk(x, z).await;
-                    chunk.send_packet(&mut *self.write_stream.lock().await).await;
-                    self.write_stream.lock().await.flush().await;
+                    let chunk = self.world.map.chunk(x, z).await;
+                    self.send_packet(&*chunk).await?;
                 }
             }
         }
+        Ok(())
     }
 
     async fn handle_packet(&self) -> Result<()> {
@@ -141,14 +135,14 @@ impl Player {
                 InChatMessage::PACKET_ID => {
                     let in_message = InChatMessage::parse(rest_reader).await?;
                     let out_message = OutChatMessage::from_player_message(&self, in_message);
-                    self.world.broadcast_packet(&out_message).await;
+                    self.world.broadcast_packet(&out_message).await?;
                 },
                 InPlayerPosition::PACKET_ID => {
                     let in_position = InPlayerPosition::parse(rest_reader).await?;
                     let delta = self.position.lock().await.update_position(&in_position);
 
                     let out_position = OutPosition::from(&self, &delta, in_position.on_ground);
-                    self.world.broadcast_packet_except(&out_position, &self).await;
+                    self.world.broadcast_packet_except(&out_position, &self).await?;
                 },
                 InPlayerPositionRotation::PACKET_ID => {
                     let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
@@ -156,20 +150,20 @@ impl Player {
                     self.position.lock().await.update_angle(&in_position_rotation);
 
                     let out_position_rotation = OutPositionRotation::from(&self, &delta, in_position_rotation.on_ground).await;
-                    self.world.broadcast_packet_except(&out_position_rotation, &self).await;
+                    self.world.broadcast_packet_except(&out_position_rotation, &self).await?;
 
                     let out_head_look = OutEntityHeadLook::from(&self).await;
-                    self.world.broadcast_packet_except(&out_head_look, &self).await;
+                    self.world.broadcast_packet_except(&out_head_look, &self).await?;
                 },
                 InPlayerRotation::PACKET_ID => {
                     let in_rotation = InPlayerRotation::parse(rest_reader).await?;
                     self.position.lock().await.update_angle(&in_rotation);
 
                     let out_rotation = OutRotation::from(&self, in_rotation.on_ground).await;
-                    self.world.broadcast_packet_except(&out_rotation, &self).await;
+                    self.world.broadcast_packet_except(&out_rotation, &self).await?;
 
                     let out_head_look = OutEntityHeadLook::from(&self).await;
-                    self.world.broadcast_packet_except(&out_head_look, &self).await;
+                    self.world.broadcast_packet_except(&out_head_look, &self).await?;
                 },
                 _ => {
                     let _error = futures::io::copy(rest_reader, &mut futures::io::sink()).await;
@@ -177,7 +171,6 @@ impl Player {
                 }
             }
         }
-        Ok(())
     }
 }
 
@@ -226,6 +219,7 @@ struct InfoProperty {
     signed: bool,
 }
 
+#[allow(dead_code)]
 impl InfoProperty {
     pub fn new_texture(path: &str) -> Self {
         Self {
