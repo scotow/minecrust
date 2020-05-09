@@ -67,7 +67,7 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
         R: AsyncRead + Unpin + Sized + std::marker::Send,
         W: AsyncWrite + Unpin + std::marker::Send,
 {
-    let mut first = true;
+    let _first = true;
     loop {
         let size = reader.read_var_int().await?;
 
@@ -107,7 +107,7 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
             // 0x3E, /* World border */
             // 0x25, /* Update light */
             // 0x4F, /* Time update */
-            0x41, *OutViewPosition,
+            0x41, *OutViewPosition::PACKET_ID,
         ];
         let client_to_server = vec![
             0x00, *StatusRequest::PACKET_ID,
@@ -120,10 +120,8 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
 
         if (direction == Direction::ServerToClient && server_to_client.contains(&*packet_id)) ||
             (direction == Direction::ClientToServer && client_to_server.contains(&*packet_id)) {
-            // println!("{}: {:02X?} ..", direction, *packet_id);
-            writer.write_all(&packet).await?;
-        } else if *packet_id == 0x41 {
             println!("{}: {:02X?} ..", direction, *packet_id);
+            writer.write_all(&packet).await?;
         }
 
         // if direction == Direction::ClientToServer ||

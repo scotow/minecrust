@@ -24,6 +24,13 @@ impl EntityPosition {
         Self::new(x as f64, y as f64, z as f64, 0, 0)
     }
 
+    pub fn rotation(&self) -> (f32, f32) {
+        (
+            self.x_angle as f32 * 360. / 256.,
+            self.z_angle as f32 * 360. / 256.
+        )
+    }
+
     pub fn chunk(&self) -> (i32, i32) {
         let (mut x, mut z) = (self.x as i32, self.z as i32);
         if x < 0 { x -= 16 }

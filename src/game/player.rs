@@ -1,6 +1,6 @@
-use crate::packets::play::held_item_slot::HeldItemSlot;
+
 use crate::packets::play::join_game::{GameMode};
-use crate::packets::play::{player_position::OutPlayerPositionLook, slot::{Slot, Window}, chat_message};
+use crate::packets::play::{player_position::OutPlayerPositionLook, chat_message};
 use crate::packets::{Packet, ServerDescription};
 use crate::fsm::State;
 use crate::types::{self, VarInt, LengthVec, BoolOption, EntityPosition};
@@ -18,6 +18,7 @@ use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRo
 use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
 use crate::types::chat::Chat;
 use std::collections::HashSet;
+
 
 /// here we use the Arc to get interior mutability
 pub struct Player {
@@ -80,17 +81,10 @@ impl Player {
     }
 
     pub async fn run(&self) -> Result<()> {
+        self.send_chunks_around(4).await?;
+
         let position = OutPlayerPositionLook::from(&*self.position.lock().await);
         position.send_packet(&mut *self.write_stream.lock().await).await?;
-        self.write_stream.lock().await.flush().await?;
-
-        for i in 0..=45 {
-            let slot = Slot::empty(Window::Inventory, i);
-            slot.send_packet(&mut *self.write_stream.lock().await).await?;
-        }
-        HeldItemSlot::new(4)?
-            .send_packet(&mut *self.write_stream.lock().await)
-            .await?;
         self.write_stream.lock().await.flush().await?;
 
         let message = OutChatMessage::new(
@@ -99,7 +93,6 @@ impl Player {
         );
         self.send_packet(&message).await?;
 
-        self.send_chunks_around(16).await?;
         self.handle_packet().await
     }
 

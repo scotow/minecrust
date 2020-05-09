@@ -19,12 +19,13 @@ impl_packet!(OutPlayerPositionLook, 0x36);
 
 impl From<&EntityPosition> for OutPlayerPositionLook {
     fn from(position: &EntityPosition) -> Self {
+        let rotation = position.rotation();
         Self {
             x: position.x,
             y: position.y,
             z: position.z,
-            x_angle: position.x_angle as f32,
-            z_angle: position.x_angle as f32,
+            x_angle: rotation.0,
+            z_angle: rotation.1,
             relative_flag: 0,
             teleport_id: VarInt(0),
         }

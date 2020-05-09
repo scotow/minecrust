@@ -34,7 +34,7 @@ impl Default for JoinGame {
             max_player: 0,
             level_type: LevelType::Default,
             view_distance: VarInt::new(16),
-            reduced_debug_info: true,
+            reduced_debug_info: false,
             enable_respawn_screen: false,
         }
     }
@@ -61,13 +61,6 @@ pub enum Dimension {
 }
 impl_size!(Dimension, 4);
 impl_send!(Dimension as i32);
-
-// #[async_trait::async_trait]
-// impl types::Send for Dimension {
-//     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
-//         writer.write_i8(*self as i8).await
-//     }
-// }
 
 #[derive(Copy, Clone, Debug)]
 pub enum LevelType {
