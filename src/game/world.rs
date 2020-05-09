@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::packets::play::keep_alive::KeepAlive;
 use crate::types;
 use futures_timer::Delay;
-use piper::{Lock, Arc, LockGuard};
+use piper::{Lock, Arc};
 use std::collections::HashMap;
 use std::time::Duration;
 use crate::packets::Packet;
@@ -12,9 +12,9 @@ use crate::packets::play::spawn_player::SpawnPlayer;
 use crate::packets::play::destroy_entity::DestroyEntity;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::chat_message::{OutChatMessage, Position};
-use crate::types::chat::{Chat, ChatBuilder, ChatComponent, Attribute, Color};
-use crate::packets::play::chunk::Chunk;
-use crate::packets::play::block::Block;
+use crate::types::chat::{Chat};
+
+
 use crate::game::map::Map;
 
 pub struct World {

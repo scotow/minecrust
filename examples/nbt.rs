@@ -1,5 +1,5 @@
 use minecrust::stream::ReadExtension;
-use std::fs::{read, write};
+use std::fs::{read};
 
 fn main() {
     let mut buf = futures::io::Cursor::new(read(std::env::args().skip(1).next().unwrap()).unwrap());

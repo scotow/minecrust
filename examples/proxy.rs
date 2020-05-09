@@ -8,7 +8,7 @@ use smol::{Async, Task};
 use std::net::{TcpListener, TcpStream};
 use std::fmt::Display;
 use serde::export::Formatter;
-use minecrust::packets::Handshake;
+
 use minecrust::packets::play::chat_message::OutChatMessage;
 use minecrust::packets::play::join_game::JoinGame;
 use minecrust::packets::play::player_info::PlayerInfo;

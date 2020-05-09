@@ -1,6 +1,6 @@
-use crate::packets::play::chunk::Chunk;
+
 use crate::packets::play::held_item_slot::HeldItemSlot;
-use crate::packets::play::join_game::{JoinGame, GameMode};
+use crate::packets::play::join_game::{GameMode};
 use crate::packets::play::{player_position::OutPlayerPositionLook, slot::{Slot, Window}, chat_message};
 use crate::packets::{Packet, ServerDescription};
 
@@ -8,10 +8,10 @@ use crate::fsm::State;
 use crate::types::{self, VarInt, LengthVec, BoolOption, EntityPosition};
 use anyhow::Result;
 use futures::prelude::*;
-use piper::{Arc, Lock, LockGuard};
+use piper::{Lock, LockGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::packets::play::block::Block;
-use futures_timer::Delay;
+
+
 use crate::packets::play::chat_message::{OutChatMessage, InChatMessage};
 use crate::game::world::World;
 use crate::stream::ReadExtension;
@@ -20,8 +20,8 @@ use futures::AsyncWriteExt;
 use std::cmp::min;
 use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, InPlayerRotation};
 use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
-use std::cell::{RefCell, Cell};
-use std::str::FromStr;
+
+
 use crate::types::chat::Chat;
 use std::collections::HashSet;
 

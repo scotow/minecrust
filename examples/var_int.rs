@@ -1,5 +1,5 @@
 use minecrust::stream::ReadExtension;
-use std::fs::{read, write};
+
 
 fn main() {
     let mut buf = futures::io::Cursor::new(vec![0x8C, 0x10]);

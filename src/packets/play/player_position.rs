@@ -4,7 +4,7 @@ use crate::types::{EntityPosition, VarInt};
 use futures::AsyncRead;
 use anyhow::Result;
 use crate::stream::ReadExtension;
-use crate::game::player::Player;
+
 
 #[derive(Debug, Default, macro_derive::Size, macro_derive::Send)]
 pub struct OutPlayerPositionLook {

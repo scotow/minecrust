@@ -1,4 +1,4 @@
-use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, PlayerPositionPacket, PlayerRotationPacket};
+use crate::packets::play::player_position::{PlayerPositionPacket, PlayerRotationPacket};
 
 #[derive(Debug, Clone, macro_derive::Size, macro_derive::Send)]
 pub struct EntityPosition {
