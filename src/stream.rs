@@ -62,6 +62,10 @@ pub trait ReadExtension: AsyncRead + Unpin + Sized {
     async fn read_string(&mut self) -> Result<String> {
         String::parse(self).await
     }
+
+    async fn read_block_position(&mut self) -> Result<BlockPosition> {
+        Ok(self.read_u64().await?.into())
+    }
 }
 
 impl<R: AsyncRead + Unpin> ReadExtension for R {}

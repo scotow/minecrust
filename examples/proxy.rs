@@ -18,6 +18,8 @@ use minecrust::packets::play::keep_alive::KeepAlive;
 use minecrust::packets::play::chunk::Chunk;
 use minecrust::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
 use minecrust::packets::play::destroy_entity::DestroyEntity;
+use minecrust::packets::play::player_digging::PlayerDigging;
+use minecrust::packets::play::block_change::BlockChange;
 
 fn main() {
     let listener = Async::<TcpListener>::bind("127.0.0.1:25566").unwrap();
@@ -92,6 +94,8 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
             0x01, *Ping::PACKET_ID,
             0x02, *LoginRequest::SUCCESS_PACKET_ID,
             0x05, *SpawnPlayer::PACKET_ID,
+            0x08, /* Acknowledge Player Digging */
+            0x0C, *BlockChange::PACKET_ID,
             0x0F, *OutChatMessage::PACKET_ID,
             0x21, *KeepAlive::PACKET_ID,
             0x22, *Chunk::PACKET_ID,
@@ -115,7 +119,8 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
             0x0F, /*Keep Alive*/
             0x11, *InPlayerPosition::PACKET_ID,
             0x12, *InPlayerPositionRotation::PACKET_ID,
-            0x13, *InPlayerRotation::PACKET_ID
+            0x13, *InPlayerRotation::PACKET_ID,
+            0x1A, *PlayerDigging::PACKET_ID,
         ];
 
         if (direction == Direction::ServerToClient && server_to_client.contains(&*packet_id)) ||

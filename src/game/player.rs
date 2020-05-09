@@ -18,6 +18,9 @@ use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRo
 use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
 use crate::types::chat::Chat;
 use std::collections::HashSet;
+use crate::packets::play::player_digging::PlayerDigging;
+use crate::packets::play::block_change::BlockChange;
+use crate::packets::play::block::Block;
 
 
 /// here we use the Arc to get interior mutability
@@ -121,7 +124,7 @@ impl Player {
                         self.send_packet(&out_view).await?;
                     }
 
-                    self.send_needed_chunks(16).await?;
+                    self.send_needed_chunks(4).await?;
                 },
                 InPlayerPositionRotation::PACKET_ID => {
                     let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
@@ -139,7 +142,7 @@ impl Player {
                         self.send_packet(&out_view).await?;
                     }
 
-                    self.send_needed_chunks(16).await?;
+                    self.send_needed_chunks(4).await?;
                 },
                 InPlayerRotation::PACKET_ID => {
                     let in_rotation = InPlayerRotation::parse(rest_reader).await?;
@@ -150,6 +153,13 @@ impl Player {
 
                     let out_head_look = OutEntityHeadLook::from(&self).await;
                     self.world.broadcast_packet_except(&out_head_look, &self).await?;
+                },
+                PlayerDigging::PACKET_ID => {
+                    let action = PlayerDigging::parse(rest_reader).await?;
+                    if let PlayerDigging::FinishedDigging(position, _face) = dbg!(action) {
+                        let block_change = BlockChange::new(position.clone(), Block::Air);
+                        self.world.broadcast_packet_except(&block_change, &self).await?;
+                    }
                 },
                 _ => {
                     let _error = futures::io::copy(rest_reader, &mut futures::io::sink()).await;

@@ -28,7 +28,7 @@ impl Default for JoinGame {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs() as i32,
-            game_mode: GameMode::Creative,
+            game_mode: GameMode::Survival,
             dimension: Dimension::Overworld,
             hash_seed: 0,
             max_player: 0,

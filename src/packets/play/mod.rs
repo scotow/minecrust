@@ -11,3 +11,5 @@ pub mod player_info;
 pub mod spawn_player;
 pub mod destroy_entity;
 pub mod entity_position;
+pub mod player_digging;
+pub mod block_change;

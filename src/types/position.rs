@@ -1,4 +1,8 @@
 use crate::packets::play::player_position::{PlayerPositionPacket, PlayerRotationPacket};
+use futures::{AsyncRead, AsyncWrite};
+use crate::stream::ReadExtension;
+use anyhow::Result;
+use crate::types::{Send};
 
 #[derive(Debug, Clone, macro_derive::Size, macro_derive::Send)]
 pub struct EntityPosition {
@@ -70,9 +74,52 @@ impl EntityPosition {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PositionDelta {
     pub x: i16,
     pub y: i16,
     pub z: i16,
     pub subchunk_changed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockPosition {
+    pub x: i32,
+    pub y: u16,
+    pub z: i32,
+}
+crate ::impl_size!(BlockPosition, 8);
+
+#[async_trait::async_trait]
+impl Send for BlockPosition {
+    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+        let n = ((self.x as u32 as u64 & 0x3FFFFFF) << 38) |
+            ((self.z as u32 as u64 & 0x3FFFFFF) << 12) |
+            (self.y as u64 & 0xFFF);
+        n.send(writer).await
+    }
+}
+
+impl BlockPosition {
+    pub fn new(x: i32, y: u16, z: i32) -> Self {
+        Self { x, y, z }
+    }
+
+    pub fn from_u64(n: u64) -> Self {
+        Self::new(
+            (n >> 38) as i32,
+            (n & 0xFFF) as u16,
+            (n << 26 >> 38) as i32,
+        )
+    }
+
+    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
+        Ok(reader.read_u64().await?.into())
+    }
+}
+
+impl From<u64> for BlockPosition {
+    fn from(n: u64) -> Self {
+        Self::from_u64(n)
+    }
 }
