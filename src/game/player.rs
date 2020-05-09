@@ -1,27 +1,21 @@
-
 use crate::packets::play::held_item_slot::HeldItemSlot;
 use crate::packets::play::join_game::{GameMode};
 use crate::packets::play::{player_position::OutPlayerPositionLook, slot::{Slot, Window}, chat_message};
 use crate::packets::{Packet, ServerDescription};
-
 use crate::fsm::State;
 use crate::types::{self, VarInt, LengthVec, BoolOption, EntityPosition};
 use anyhow::Result;
 use futures::prelude::*;
 use piper::{Lock, LockGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-
 use crate::packets::play::chat_message::{OutChatMessage, InChatMessage};
 use crate::game::world::World;
 use crate::stream::ReadExtension;
 use uuid::Uuid;
 use futures::AsyncWriteExt;
 use std::cmp::min;
-use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, InPlayerRotation};
+use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition};
 use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
-
-
 use crate::types::chat::Chat;
 use std::collections::HashSet;
 
@@ -105,23 +99,8 @@ impl Player {
         );
         self.send_packet(&message).await?;
 
-        // futures::join!(self.send_chunks_around(16), self.handle_packet());
         self.send_chunks_around(16).await?;
         self.handle_packet().await
-    }
-
-    async fn send_chunks_around(&self, range: i32) -> Result<()> {
-        for r in 0..range {
-            for z in -r..r {
-                for x in -r..r {
-                    if !self.loaded_chunks.lock().await.insert((x, z)) { continue }
-
-                    let chunk = self.world.map.chunk(x, z).await;
-                    self.send_packet(&*chunk).await?;
-                }
-            }
-        }
-        Ok(())
     }
 
     async fn handle_packet(&self) -> Result<()> {
@@ -143,6 +122,13 @@ impl Player {
 
                     let out_position = OutPosition::from(&self, &delta, in_position.on_ground);
                     self.world.broadcast_packet_except(&out_position, &self).await?;
+
+                    if delta.subchunk_changed {
+                        let out_view = OutViewPosition::from(&*self.position.lock().await);
+                        self.send_packet(&out_view).await?;
+                    }
+
+                    self.send_needed_chunks(16).await?;
                 },
                 InPlayerPositionRotation::PACKET_ID => {
                     let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
@@ -154,6 +140,13 @@ impl Player {
 
                     let out_head_look = OutEntityHeadLook::from(&self).await;
                     self.world.broadcast_packet_except(&out_head_look, &self).await?;
+
+                    if delta.subchunk_changed {
+                        let out_view = OutViewPosition::from(&*self.position.lock().await);
+                        self.send_packet(&out_view).await?;
+                    }
+
+                    self.send_needed_chunks(16).await?;
                 },
                 InPlayerRotation::PACKET_ID => {
                     let in_rotation = InPlayerRotation::parse(rest_reader).await?;
@@ -171,6 +164,40 @@ impl Player {
                 }
             }
         }
+    }
+
+    async fn send_chunks_around(&self, range: i32) -> Result<()> {
+        let (p_x, p_z) = self.position.lock().await.chunk();
+        let mut chunks = self.loaded_chunks.lock().await;
+
+        for z in p_z - range..p_z + range {
+            for x in p_x - range..p_x + range {
+                if !chunks.insert((x, z)) { continue }
+
+                let chunk = self.world.map.chunk(x, z).await;
+                self.send_packet(&*chunk).await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn send_needed_chunks(&self, range: i32) -> Result<()> {
+        let full = {
+            let (x, z) = self.position.lock().await.chunk();
+            let chunks = self.loaded_chunks.lock().await;
+
+            (-range..range).all(|r| {
+                chunks.contains(&(x - range, z + r)) &&
+                    chunks.contains(&(x + range, z + r)) &&
+                    chunks.contains(&(x + r, z - range)) &&
+                    chunks.contains(&(x + r, z - range))
+            })
+        };
+        if full {
+            return Ok(())
+        }
+
+        self.send_chunks_around(range).await
     }
 }
 

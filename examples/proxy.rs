@@ -12,7 +12,7 @@ use serde::export::Formatter;
 use minecrust::packets::play::chat_message::OutChatMessage;
 use minecrust::packets::play::join_game::JoinGame;
 use minecrust::packets::play::player_info::PlayerInfo;
-use minecrust::packets::play::player_position::{OutPlayerPositionLook, InPlayerPosition, InPlayerPositionRotation, InPlayerRotation};
+use minecrust::packets::play::player_position::{OutPlayerPositionLook, InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition};
 use minecrust::packets::play::spawn_player::SpawnPlayer;
 use minecrust::packets::play::keep_alive::KeepAlive;
 use minecrust::packets::play::chunk::Chunk;
@@ -67,6 +67,7 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
         R: AsyncRead + Unpin + Sized + std::marker::Send,
         W: AsyncWrite + Unpin + std::marker::Send,
 {
+    let mut first = true;
     loop {
         let size = reader.read_var_int().await?;
 
@@ -101,7 +102,12 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
             0x34, *PlayerInfo::PACKET_ID,
             0x36, *OutPlayerPositionLook::PACKET_ID,
             0x38, *DestroyEntity::PACKET_ID,
-            0x3C, *OutEntityHeadLook::PACKET_ID
+            0x3C, *OutEntityHeadLook::PACKET_ID,
+            // 0x1E, /* Unload chunk */
+            // 0x3E, /* World border */
+            // 0x25, /* Update light */
+            // 0x4F, /* Time update */
+            0x41, *OutViewPosition,
         ];
         let client_to_server = vec![
             0x00, *StatusRequest::PACKET_ID,
@@ -114,19 +120,39 @@ async fn filter_packet<R, W>(reader: &mut R, writer: &mut W, direction: Directio
 
         if (direction == Direction::ServerToClient && server_to_client.contains(&*packet_id)) ||
             (direction == Direction::ClientToServer && client_to_server.contains(&*packet_id)) {
-            println!("{}: {:02X?} ..", direction, *packet_id);
+            // println!("{}: {:02X?} ..", direction, *packet_id);
             writer.write_all(&packet).await?;
+        } else if *packet_id == 0x41 {
+            println!("{}: {:02X?} ..", direction, *packet_id);
         }
 
-        // if direction == Direction::ServerToClient && *packet_id == 0x34 {
-        //     println!("{}: {:02X?}", direction, &packet);
+        // if direction == Direction::ClientToServer ||
+        //     direction == Direction::ServerToClient && *packet_id != 0x25 {
+        //     writer.write_all(&packet).await?;
+        // } else {
+        //     dbg!(*packet_id);
         // }
 
-        // let mut first = true;
-        // if *packet_id == 0x22 && first {
+        // if direction == Direction::ServerToClient && !server_to_client.contains(&*packet_id) {
+        //     println!("{}: {:02X?} ..", direction, *packet_id);
+        //     // writer.write_all(&packet).await?;
+        // }
+
+        // if *packet_id == 0x25 && first {
         //     first = false;
-        //     std::fs::write("minecrust_chunk8.bin", &packet);
-        //     // std::fs::write("mojang_chunk.bin", &packet);
+        //     std::fs::write("mojang_skylight.bin", &packet);
+        //
+        //     let mut reader = futures::io::Cursor::new(&packet);
+        //     &reader.read_var_int().await.unwrap();
+        //     &reader.read_var_int().await.unwrap();
+        //
+        //     dbg!(&reader.read_var_int().await.unwrap());
+        //     dbg!(&reader.read_var_int().await.unwrap());
+        //     println!("{:#018b}", **&reader.read_var_int().await.unwrap());
+        //     println!("{:#018b}", **&reader.read_var_int().await.unwrap());
+        //     println!("{:#018b}", **&reader.read_var_int().await.unwrap());
+        //     println!("{:#018b}", **&reader.read_var_int().await.unwrap());
+        //     dbg!(&reader.read_var_int().await.unwrap());
         // }
     }
 }

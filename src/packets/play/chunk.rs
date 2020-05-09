@@ -28,6 +28,16 @@ impl Chunk {
         }
     }
 
+    pub fn clone(&self, x: i32, z: i32) -> Self {
+        Self {
+            x,
+            z,
+            heightmap: self.heightmap.clone(),
+            biomes: self.biomes.clone(),
+            sections: self.sections.clone(),
+        }
+    }
+
     fn bitmask(&self) -> VarInt {
         let mut bitmask = 0;
         for (y, exists) in self.sections.iter().map(Option::is_some).enumerate() {
@@ -105,6 +115,7 @@ impl types::Send for Chunk {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Heightmap(BitArray<Vec<u64>>);
 
 impl Heightmap {
@@ -138,12 +149,6 @@ impl From<&Heightmap> for Blob {
     }
 }
 
-impl Debug for Heightmap {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        self.0.as_slice().fmt(formatter)
-    }
-}
-
 impl types::Size for Heightmap {
     fn size(&self) -> types::VarInt {
         // 0A + u16 + (0C + u16 + MOTION_BLOCKING_KEY.len() + (36 as u32) + 36 * i64) + EOF
@@ -160,7 +165,7 @@ impl types::Send for Heightmap {
     }
 }
 
-#[derive(Debug, macro_derive::Size, macro_derive::Send)]
+#[derive(Debug, Clone, macro_derive::Size, macro_derive::Send)]
 struct ChunkSection {
     block_count: i16,
     bits_per_block: u8,
@@ -214,6 +219,7 @@ impl types::Send for [Option<ChunkSection>; 16] {
     }
 }
 
+#[derive(Clone)]
 struct Biomes([Biome; 1024]);
 
 impl Biomes {

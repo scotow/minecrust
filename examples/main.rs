@@ -15,9 +15,11 @@ use minecrust::packets::{Handshake, LoginRequest, Packet, Ping, ServerDescriptio
 use minecrust::types::{self, Size};
 use piper::{Arc, Mutex};
 use std::time::Duration;
+use minecrust::game::map::generator::FlatChunkGenerator;
 
 fn main() -> ! {
-    let world = smol::block_on(World::new());
+    let generator = FlatChunkGenerator::new();
+    let world = smol::block_on(World::new(generator));
     eprintln!("World map generated.");
 
     let world: &'static World = Box::leak(Box::new(world));

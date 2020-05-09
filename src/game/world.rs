@@ -13,9 +13,8 @@ use crate::packets::play::destroy_entity::DestroyEntity;
 use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::chat_message::{OutChatMessage, Position};
 use crate::types::chat::{Chat};
-
-
 use crate::game::map::Map;
+use crate::game::map::generator::ChunkGenerator;
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Arc<Player>>>,
@@ -23,24 +22,19 @@ pub struct World {
 }
 
 impl World {
-    pub async fn new() -> Self {
+    pub async fn new(generator: impl ChunkGenerator + Sync + std::marker::Send + 'static) -> Self {
         Self {
             players: Lock::new(HashMap::new()),
-            map: Map::new().await
+            map: Map::new(generator).await,
         }
     }
 
     pub async fn run(&self, heartbeat: Duration) {
-        let keep_alive_loop = async {
-            loop {
-                Delay::new(heartbeat).await;
-                let keep_alive_packet = KeepAlive::new();
-                let _ = self.broadcast_packet(&keep_alive_packet).await;
-            }
-        };
-
-        // Run forever.
-        let _ = futures::join!(keep_alive_loop);
+        loop {
+            Delay::new(heartbeat).await;
+            let keep_alive_packet = KeepAlive::new();
+            let _ = self.broadcast_packet(&keep_alive_packet).await;
+        }
     }
 
     pub async fn broadcast_packet(&self, packet: &(impl Packet + Sync)) -> Result<()> {

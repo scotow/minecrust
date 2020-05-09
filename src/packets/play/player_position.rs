@@ -5,7 +5,6 @@ use futures::AsyncRead;
 use anyhow::Result;
 use crate::stream::ReadExtension;
 
-
 #[derive(Debug, Default, macro_derive::Size, macro_derive::Send)]
 pub struct OutPlayerPositionLook {
     pub x: f64,
@@ -28,6 +27,23 @@ impl From<&EntityPosition> for OutPlayerPositionLook {
             z_angle: position.x_angle as f32,
             relative_flag: 0,
             teleport_id: VarInt(0),
+        }
+    }
+}
+
+#[derive(Debug, Default, macro_derive::Size, macro_derive::Send)]
+pub struct OutViewPosition {
+    x: VarInt,
+    z: VarInt,
+}
+impl_packet!(OutViewPosition, 0x41);
+
+impl From<&EntityPosition> for OutViewPosition {
+    fn from(position: &EntityPosition) -> Self {
+        let (x, z) = position.chunk();
+        Self {
+            x: VarInt(x),
+            z: VarInt(z),
         }
     }
 }

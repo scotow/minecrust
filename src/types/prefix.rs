@@ -4,7 +4,7 @@ use futures::AsyncWrite;
 use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Clone, Default)]
-pub struct LengthVec<T: Sized>(pub Vec<T>);
+pub struct LengthVec<T>(pub Vec<T>);
 
 impl<T> LengthVec<T> {
     pub fn new() -> Self {
@@ -56,7 +56,7 @@ impl<T: Send + Sync + std::marker::Send> Send for LengthVec<T> {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct SizeVec<T: Sized>(pub Vec<T>);
+pub struct SizeVec<T>(pub Vec<T>);
 
 impl<T> SizeVec<T> {
     pub fn new() -> Self {

@@ -41,6 +41,15 @@ impl BitArray<LengthVec<u64>> {
     }
 }
 
+impl<T: Clone> Clone for BitArray<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            bits_per_value: self.bits_per_value,
+        }
+    }
+}
+
 impl<'a, T: Deref<Target=[u64]>> BitArray<T> {
     pub fn as_slice(&'a self) -> &'a [u64] {
         &self.data

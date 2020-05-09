@@ -24,16 +24,36 @@ impl EntityPosition {
         Self::new(x as f64, y as f64, z as f64, 0, 0)
     }
 
+    pub fn chunk(&self) -> (i32, i32) {
+        let (mut x, mut z) = (self.x as i32, self.z as i32);
+        if x < 0 { x -= 16 }
+        if z < 0 { z -= 16 }
+
+        (x / 16, z / 16)
+    }
+
+    pub fn subchunk(&self) -> (i32, i32, i32) {
+        let mut y = self.y as i32;
+        if y < 0 { y -= 16 }
+
+        let (x, z) = self.chunk();
+        (x, y / 16, z)
+    }
+
     pub fn update_position(&mut self, from: &dyn PlayerPositionPacket) -> PositionDelta {
-        let delta = PositionDelta(
-            ((from.x() * 32. - self.x * 32.) * 128.) as i16,
-            ((from.y() * 32. - self.y * 32.) * 128.) as i16,
-            ((from.z() * 32. - self.z * 32.) * 128.) as i16,
-        );
+        let before_subchunk = self.subchunk();
+
+        let mut delta = PositionDelta {
+            x: ((from.x() * 32. - self.x * 32.) * 128.) as i16,
+            y: ((from.y() * 32. - self.y * 32.) * 128.) as i16,
+            z: ((from.z() * 32. - self.z * 32.) * 128.) as i16,
+            subchunk_changed: false,
+        };
         self.x = from.x();
         self.y = from.y();
         self.z = from.z();
 
+        delta.subchunk_changed = before_subchunk != self.subchunk();
         delta
     }
 
@@ -43,4 +63,9 @@ impl EntityPosition {
     }
 }
 
-pub struct PositionDelta(pub i16, pub i16, pub i16);
+pub struct PositionDelta {
+    pub x: i16,
+    pub y: i16,
+    pub z: i16,
+    pub subchunk_changed: bool,
+}

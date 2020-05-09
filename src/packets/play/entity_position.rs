@@ -19,9 +19,9 @@ impl OutPosition {
     pub fn from(player: &Player, delta: &PositionDelta, on_ground: bool) -> Self {
         Self {
             id: player.id(),
-            delta_x: delta.0,
-            delta_y: delta.1,
-            delta_z: delta.2,
+            delta_x: delta.x,
+            delta_y: delta.y,
+            delta_z: delta.z,
             on_ground,
         }
     }
@@ -44,9 +44,9 @@ impl OutPositionRotation {
         let current_position = player.position().await;
         Self {
             id: player.id(),
-            delta_x: delta.0,
-            delta_y: delta.1,
-            delta_z: delta.2,
+            delta_x: delta.x,
+            delta_y: delta.y,
+            delta_z: delta.z,
             x_angle: current_position.x_angle,
             z_angle: current_position.z_angle,
             on_ground,
