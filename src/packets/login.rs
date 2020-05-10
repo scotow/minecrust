@@ -5,7 +5,7 @@ use crate::types::{self, Send, Size};
 use anyhow::{anyhow, Result};
 use std::marker::Unpin;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoginRequest {
     pub user_name: types::String,
 }

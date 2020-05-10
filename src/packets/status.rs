@@ -1,14 +1,12 @@
-use futures::prelude::*;
-use std::marker::Unpin;
-
 use crate::impl_packet;
 use crate::packets::Packet;
 use crate::stream::ReadExtension;
 use crate::types::{self, Send, Size};
 use anyhow::{anyhow, ensure, Result};
-
+use futures::prelude::*;
 use serde::Serialize;
 use serde_json::json;
+use std::marker::Unpin;
 
 pub struct StatusRequest {}
 

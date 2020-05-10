@@ -1,21 +1,18 @@
 #![allow(unused_must_use, unused_imports)]
-
-use futures::prelude::*;
-use std::marker::Unpin;
-use std::net::TcpListener;
-
 use anyhow::Result;
-use smol::{Async, Task};
-
 use futures::io::BufReader;
+use futures::prelude::*;
+use minecrust::game::map::generator::FlatChunkGenerator;
 use minecrust::game::player::Player;
 use minecrust::game::world::World;
 use minecrust::packets::play::slot::{Slot, Window};
 use minecrust::packets::{Handshake, LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
 use minecrust::types::{self, Size};
 use piper::{Arc, Mutex};
+use smol::{Async, Task};
+use std::marker::Unpin;
+use std::net::TcpListener;
 use std::time::Duration;
-use minecrust::game::map::generator::FlatChunkGenerator;
 
 fn main() -> ! {
     let generator = FlatChunkGenerator::new();
@@ -38,11 +35,9 @@ fn main() -> ! {
             let stream = Arc::new(stream.unwrap());
             let reader = futures::io::BufReader::new(stream.clone());
             let writer = futures::io::BufWriter::new(stream.clone());
-            let player = Player::new(
-                reader, writer,
-                server_description.clone(),
-                world,
-            ).await.unwrap();
+            let player = Player::new(reader, writer, server_description.clone(), world)
+                .await
+                .unwrap();
             if player.is_none() {
                 continue;
             }

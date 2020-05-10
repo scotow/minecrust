@@ -1,29 +1,30 @@
-
-use crate::packets::play::join_game::{GameMode};
-use crate::packets::play::{player_position::OutPlayerPositionLook, chat_message};
+use crate::fsm::Fsm;
+use crate::game::world::World;
+use crate::packets::play::block::Block;
+use crate::packets::play::block_change::BlockChange;
+use crate::packets::play::chat_message::{InChatMessage, OutChatMessage};
+use crate::packets::play::entity_position::{
+    OutEntityHeadLook, OutPosition, OutPositionRotation, OutRotation,
+};
+use crate::packets::play::join_game::GameMode;
+use crate::packets::play::player_digging::PlayerDigging;
+use crate::packets::play::player_position::{
+    InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition,
+};
+use crate::packets::play::{chat_message, player_position::OutPlayerPositionLook};
 use crate::packets::{Packet, ServerDescription};
-use crate::fsm::State;
-use crate::types::{self, VarInt, LengthVec, BoolOption, EntityPosition};
+use crate::stream::ReadExtension;
+use crate::types::chat::Chat;
+use crate::types::{self, BoolOption, EntityPosition, LengthVec, VarInt};
 use anyhow::Result;
 use futures::prelude::*;
-use piper::{Lock, LockGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
-use crate::packets::play::chat_message::{OutChatMessage, InChatMessage};
-use crate::game::world::World;
-use crate::stream::ReadExtension;
-use uuid::Uuid;
 use futures::AsyncWriteExt;
+use piper::{Lock, LockGuard};
 use std::cmp::min;
-use crate::packets::play::player_position::{InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition};
-use crate::packets::play::entity_position::{OutPosition, OutPositionRotation, OutRotation, OutEntityHeadLook};
-use crate::types::chat::Chat;
 use std::collections::HashSet;
-use crate::packets::play::player_digging::PlayerDigging;
-use crate::packets::play::block_change::BlockChange;
-use crate::packets::play::block::Block;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
-
-/// here we use the Arc to get interior mutability
 pub struct Player {
     read_stream: Lock<Box<dyn AsyncRead + Send + Sync + Unpin>>,
     write_stream: Lock<Box<dyn AsyncWrite + Send + Sync + Unpin>>,
@@ -31,42 +32,48 @@ pub struct Player {
     id: types::VarInt,
     info: Info,
     position: Lock<EntityPosition>,
-    loaded_chunks: Lock<HashSet<(i32, i32)>>
+    loaded_chunks: Lock<HashSet<(i32, i32)>>,
 }
 
 impl Player {
     pub async fn new(
-        mut reader: impl AsyncRead + Send + Sync + Unpin + 'static,
-        mut writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
+        reader: impl AsyncRead + Send + Sync + Unpin + 'static,
+        writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
         server_description: ServerDescription,
-        world: &'static World
+        world: &'static World,
     ) -> Result<Option<Self>> {
-        let state = State::new(server_description);
-        match state.next(&mut reader, &mut writer).await? {
-            State::Handshake(_) | State::Finished => panic!("This should never happens"),
-            state @ State::Status(_) => {
-                // ignore what happens after a ping has been asked
-                let _ = state.next(&mut reader, &mut writer).await;
-                return Ok(None);
-            }
-            state @ State::Play => {
-                state.next(&mut reader, &mut writer).await?;
-                let id = (SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() % 1000) as i32;
-                return Ok(Some(Self {
-                    read_stream: Lock::new(Box::new(reader)),
-                    write_stream: Lock::new(Box::new(writer)),
-                    world,
-                    id: VarInt(id),
-                    info: Info::from_id(id),
-                    position: Lock::new(EntityPosition::new(0., 5., 0., 0, 0)),
-                    loaded_chunks: Lock::new(HashSet::new())
-                }));
-            }
+        let mut reader: Box<dyn AsyncRead + Send + Sync + Unpin> = Box::new(reader);
+        let mut writer: Box<dyn AsyncWrite + Send + Sync + Unpin> = Box::new(writer);
+        let fsm = Fsm::from_rw(server_description, &mut reader, &mut writer);
+        let login = fsm.play().await?;
+        if login.is_none() {
+            return Ok(None);
         }
+        let login = login.unwrap();
+
+        let id = (SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            % 1000) as i32;
+
+        Ok(Some(Self {
+            read_stream: Lock::new(reader),
+            write_stream: Lock::new(writer),
+            world,
+            id: VarInt(id),
+            info: Info::from_name(&*login.user_name),
+            position: Lock::new(EntityPosition::new(0., 5., 0., 0, 0)),
+            loaded_chunks: Lock::new(HashSet::new()),
+        }))
     }
 
     pub fn id(&self) -> VarInt {
         self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.info.name
     }
 
     pub fn info(&self) -> &Info {
@@ -78,7 +85,9 @@ impl Player {
     }
 
     pub async fn send_packet(&self, packet: &(impl Packet + Sync)) -> Result<()> {
-        packet.send_packet(&mut *self.write_stream.lock().await).await?;
+        packet
+            .send_packet(&mut *self.write_stream.lock().await)
+            .await?;
         self.write_stream.lock().await.flush().await?;
         Ok(())
     }
@@ -87,7 +96,9 @@ impl Player {
         self.send_chunks_around(4).await?;
 
         let position = OutPlayerPositionLook::from(&*self.position.lock().await);
-        position.send_packet(&mut *self.write_stream.lock().await).await?;
+        position
+            .send_packet(&mut *self.write_stream.lock().await)
+            .await?;
         self.write_stream.lock().await.flush().await?;
 
         let message = OutChatMessage::new(
@@ -111,13 +122,15 @@ impl Player {
                     let in_message = InChatMessage::parse(rest_reader).await?;
                     let out_message = OutChatMessage::from_player_message(&self, in_message);
                     self.world.broadcast_packet(&out_message).await?;
-                },
+                }
                 InPlayerPosition::PACKET_ID => {
                     let in_position = InPlayerPosition::parse(rest_reader).await?;
                     let delta = self.position.lock().await.update_position(&in_position);
 
                     let out_position = OutPosition::from(&self, &delta, in_position.on_ground);
-                    self.world.broadcast_packet_except(&out_position, &self).await?;
+                    self.world
+                        .broadcast_packet_except(&out_position, &self)
+                        .await?;
 
                     if delta.subchunk_changed {
                         let out_view = OutViewPosition::from(&*self.position.lock().await);
@@ -125,17 +138,30 @@ impl Player {
                     }
 
                     self.send_needed_chunks(4).await?;
-                },
+                }
                 InPlayerPositionRotation::PACKET_ID => {
                     let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
-                    let delta = self.position.lock().await.update_position(&in_position_rotation);
-                    self.position.lock().await.update_angle(&in_position_rotation);
+                    let delta = self
+                        .position
+                        .lock()
+                        .await
+                        .update_position(&in_position_rotation);
+                    self.position
+                        .lock()
+                        .await
+                        .update_angle(&in_position_rotation);
 
-                    let out_position_rotation = OutPositionRotation::from(&self, &delta, in_position_rotation.on_ground).await;
-                    self.world.broadcast_packet_except(&out_position_rotation, &self).await?;
+                    let out_position_rotation =
+                        OutPositionRotation::from(&self, &delta, in_position_rotation.on_ground)
+                            .await;
+                    self.world
+                        .broadcast_packet_except(&out_position_rotation, &self)
+                        .await?;
 
                     let out_head_look = OutEntityHeadLook::from(&self).await;
-                    self.world.broadcast_packet_except(&out_head_look, &self).await?;
+                    self.world
+                        .broadcast_packet_except(&out_head_look, &self)
+                        .await?;
 
                     if delta.subchunk_changed {
                         let out_view = OutViewPosition::from(&*self.position.lock().await);
@@ -143,24 +169,30 @@ impl Player {
                     }
 
                     self.send_needed_chunks(4).await?;
-                },
+                }
                 InPlayerRotation::PACKET_ID => {
                     let in_rotation = InPlayerRotation::parse(rest_reader).await?;
                     self.position.lock().await.update_angle(&in_rotation);
 
                     let out_rotation = OutRotation::from(&self, in_rotation.on_ground).await;
-                    self.world.broadcast_packet_except(&out_rotation, &self).await?;
+                    self.world
+                        .broadcast_packet_except(&out_rotation, &self)
+                        .await?;
 
                     let out_head_look = OutEntityHeadLook::from(&self).await;
-                    self.world.broadcast_packet_except(&out_head_look, &self).await?;
-                },
+                    self.world
+                        .broadcast_packet_except(&out_head_look, &self)
+                        .await?;
+                }
                 PlayerDigging::PACKET_ID => {
                     let action = PlayerDigging::parse(rest_reader).await?;
                     if let PlayerDigging::FinishedDigging(position, _face) = dbg!(action) {
                         let block_change = BlockChange::new(position.clone(), Block::Air);
-                        self.world.broadcast_packet_except(&block_change, &self).await?;
+                        self.world
+                            .broadcast_packet_except(&block_change, &self)
+                            .await?;
                     }
-                },
+                }
                 _ => {
                     let _error = futures::io::copy(rest_reader, &mut futures::io::sink()).await;
                     print!("{} ", packet_id);
@@ -175,7 +207,9 @@ impl Player {
 
         for z in p_z - range..p_z + range {
             for x in p_x - range..p_x + range {
-                if !chunks.insert((x, z)) { continue }
+                if !chunks.insert((x, z)) {
+                    continue;
+                }
 
                 let chunk = self.world.map.chunk(x, z).await;
                 self.send_packet(&*chunk).await?;
@@ -190,14 +224,14 @@ impl Player {
             let chunks = self.loaded_chunks.lock().await;
 
             (-range..range).all(|r| {
-                chunks.contains(&(x - range, z + r)) &&
-                    chunks.contains(&(x + range, z + r)) &&
-                    chunks.contains(&(x + r, z - range)) &&
-                    chunks.contains(&(x + r, z - range))
+                chunks.contains(&(x - range, z + r))
+                    && chunks.contains(&(x + range, z + r))
+                    && chunks.contains(&(x + r, z - range))
+                    && chunks.contains(&(x + r, z - range))
             })
         };
         if full {
-            return Ok(())
+            return Ok(());
         }
 
         self.send_chunks_around(range).await
@@ -221,6 +255,18 @@ pub struct Info {
 }
 
 impl Info {
+    pub fn from_name(name: &String) -> Self {
+        let name = types::String::new(&name[..min(name.len(), 16)]);
+        Self {
+            uuid: offline_uuid(&name),
+            name,
+            properties: LengthVec::new(),
+            game_mode: GameMode::Creative,
+            ping: VarInt::new(5),
+            display_name: BoolOption(None),
+        }
+    }
+
     pub fn from_id(id: i32) -> Self {
         let name = format!("Player {}", id);
         Self {
@@ -260,7 +306,7 @@ impl InfoProperty {
     }
 }
 
-crate ::impl_size!(Uuid, 16);
+crate::impl_size!(Uuid, 16);
 #[async_trait::async_trait]
 impl types::Send for Uuid {
     async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
@@ -272,9 +318,7 @@ impl types::Send for Uuid {
 fn offline_uuid(name: &str) -> Uuid {
     let mut context = md5::Context::new();
     context.consume(format!("OfflinePlayer:{}", name).as_bytes());
-    let mut builder = uuid::Builder::from_bytes(
-        context.compute().into()
-    );
+    let mut builder = uuid::Builder::from_bytes(context.compute().into());
 
     builder
         .set_variant(uuid::Variant::RFC4122)
