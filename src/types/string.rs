@@ -1,14 +1,12 @@
-use std::marker::Unpin;
-use std::ops::Deref;
-use std::string::String as StdString;
-
 use crate::stream::ReadExtension;
-use crate::types::{self, Send, Size};
-
+use crate::types::{self, Receive, Send, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::prelude::*;
 use futures::AsyncWriteExt;
+use std::marker::Unpin;
+use std::ops::Deref;
+use std::string::String as StdString;
 
 #[derive(Debug, Clone)]
 pub struct String(StdString);
@@ -18,9 +16,9 @@ impl String {
         Self(s.to_string())
     }
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
+    pub async fn parse(reader: &mut impl TAsyncRead) -> Result<Self> {
         let mut result = StdString::new();
-        let size = reader.read_var_int().await?;
+        let size = reader.receive::<types::VarInt>().await?;
         let read = reader
             .take(*size as u64)
             .read_to_string(&mut result)
@@ -41,7 +39,7 @@ impl Size for String {
 
 #[async_trait]
 impl Send for String {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send(&self, writer: &mut impl TAsyncWrite) -> Result<()> {
         types::VarInt::new(self.0.len() as i32).send(writer).await?;
         writer.write_all(self.0.as_bytes()).await?;
         Ok(())

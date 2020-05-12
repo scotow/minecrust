@@ -1,14 +1,11 @@
-use std::marker::Unpin;
-use std::ops::{Add, Deref};
-
-use crate::stream::ReadExtension;
-use crate::types::{Send, Size};
-
+use crate::types::{FromReader, Receive, Send, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use futures::prelude::*;
-use std::fmt::{Display, Formatter};
 use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::marker::Unpin;
+use std::ops::{Add, Deref};
 
 #[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, PartialEq, Eq, Hash)]
 pub struct VarInt(pub i32);
@@ -20,11 +17,12 @@ impl VarInt {
         Self(n)
     }
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
+    /// TODO: delete this in favor of the ReadExtension
+    pub async fn parse(reader: &mut impl Receive) -> Result<Self> {
         let mut read_int: i32 = 0;
         let mut bytes_read: i32 = 0;
         loop {
-            let incoming_byte = reader.read_u8().await?;
+            let incoming_byte = reader.receive::<u8>().await?;
             read_int |= ((incoming_byte & 0b0111_1111) as i32) << 7 * bytes_read;
             bytes_read += 1;
             if incoming_byte >> 7 == 0 {
@@ -33,6 +31,13 @@ impl VarInt {
                 return Err(anyhow!("VarInt bigger than 5 bytes sent"));
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl FromReader for VarInt {
+    async fn from_reader(reader: &mut impl TAsyncRead) -> Result<Self> {
+        VarInt::parse(reader).await
     }
 }
 
@@ -48,7 +53,7 @@ impl Size for VarInt {
 
 #[async_trait]
 impl Send for VarInt {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send(&self, writer: &mut impl TAsyncWrite) -> Result<()> {
         let mut n = self.0 as u32;
         loop {
             let tmp = n as u8 & 0b0111_1111;
