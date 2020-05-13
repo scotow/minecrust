@@ -30,13 +30,13 @@ impl<'a> Fsm<'a> {
             .clone()
             .next(&self.server_description, &mut self.reader, &mut self.writer)
             .await?;
-        Ok(state.clone())
+        Ok(state)
     }
 
     pub async fn play(mut self) -> Result<Option<LoginRequest>> {
         loop {
             self.state = match self.next().await? {
-                State::Finished(login) => return Ok(Some(login.clone())),
+                State::Finished(login) => return Ok(Some(login)),
                 State::StatusFinished => return Ok(None),
                 state @ State::Status => {
                     // ignore what happens after a ping has been asked
