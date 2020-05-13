@@ -1,5 +1,5 @@
-use crate::types::{BlockPosition, VarInt};
 use crate::packets::play::block::Block;
+use crate::types::{BlockPosition, VarInt};
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct BlockChange {
@@ -15,4 +15,4 @@ impl BlockChange {
         }
     }
 }
-crate ::impl_packet!(BlockChange, 0x0C);
+crate::impl_packet!(BlockChange, 0x0C);

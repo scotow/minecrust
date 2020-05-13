@@ -50,7 +50,7 @@ impl<T: Size + Sync> Size for LengthVec<T> {
 
 #[async_trait::async_trait]
 impl<T: Send + Sync + std::marker::Send> Send for LengthVec<T> {
-    async fn send<W: TAsyncWrite >(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         types::VarInt::new(self.0.len() as i32).send(writer).await?;
         self.0.send(writer).await
     }

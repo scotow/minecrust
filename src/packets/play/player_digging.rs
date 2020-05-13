@@ -1,6 +1,5 @@
-use crate::types::VarInt;
-use anyhow::{Result, ensure};
-use crate::types::{BlockPosition, Receive};
+use crate::types::{self, BlockPosition, Receive, TAsyncRead, VarInt};
+use anyhow::{ensure, Result};
 
 #[derive(Debug)]
 pub enum PlayerDigging {
@@ -15,8 +14,11 @@ pub enum PlayerDigging {
 
 impl PlayerDigging {
     pub const PACKET_ID: VarInt = VarInt(0x1A);
+}
 
-    pub async fn parse<R: Receive>(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl types::FromReader for PlayerDigging {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let status: VarInt = reader.receive().await?;
         ensure!((0..=6).contains(&*status), "invalid status");
 
@@ -27,18 +29,16 @@ impl PlayerDigging {
         let face = Face::from(face);
 
         use PlayerDigging::*;
-        Ok(
-            match *status {
-                0 => StartedDigging(location, face),
-                1 => CancelledDigging(location, face),
-                2 => FinishedDigging(location, face),
-                3 => DropStackItem,
-                4 => DropItem,
-                5 => UsingItem,
-                6 => SwapItem,
-                _ => unreachable!()
-            }
-        )
+        Ok(match *status {
+            0 => StartedDigging(location, face),
+            1 => CancelledDigging(location, face),
+            2 => FinishedDigging(location, face),
+            3 => DropStackItem,
+            4 => DropItem,
+            5 => UsingItem,
+            6 => SwapItem,
+            _ => unreachable!(),
+        })
     }
 }
 

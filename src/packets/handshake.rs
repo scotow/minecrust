@@ -1,6 +1,6 @@
-use futures::prelude::*;
-use crate::types::{self, TAsyncRead, Receive};
+use crate::types::{self, Receive, TAsyncRead};
 use anyhow::{anyhow, Result};
+use futures::prelude::*;
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct Handshake {
@@ -27,8 +27,11 @@ impl Handshake {
             next_state,
         }
     }
+}
 
-    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl types::FromReader for Handshake {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let size: types::VarInt = reader.receive().await?;
         let mut reader = reader.take(*size as u64);
 

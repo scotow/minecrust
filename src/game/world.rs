@@ -1,24 +1,24 @@
+use crate::game::map::generator::ChunkGenerator;
+use crate::game::map::Map;
 use crate::game::player::Player;
-use anyhow::Result;
-use crate::packets::play::keep_alive::KeepAlive;
-use crate::types;
-use futures_timer::Delay;
-use piper::{Lock, Arc};
-use std::collections::HashMap;
-use std::time::Duration;
-use crate::packets::Packet;
-use crate::packets::play::player_info::{PlayerInfo, Action};
-use crate::packets::play::spawn_player::SpawnPlayer;
+use crate::packets::play::chat_message::{OutChatMessage, Position};
 use crate::packets::play::destroy_entity::DestroyEntity;
 use crate::packets::play::join_game::JoinGame;
-use crate::packets::play::chat_message::{OutChatMessage, Position};
-use crate::types::chat::{Chat};
-use crate::game::map::Map;
-use crate::game::map::generator::ChunkGenerator;
+use crate::packets::play::keep_alive::KeepAlive;
+use crate::packets::play::player_info::{Action, PlayerInfo};
+use crate::packets::play::spawn_player::SpawnPlayer;
+use crate::packets::Packet;
+use crate::types;
+use crate::types::chat::Chat;
+use anyhow::Result;
+use futures_timer::Delay;
+use piper::{Arc, Lock};
+use std::collections::HashMap;
+use std::time::Duration;
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Arc<Player>>>,
-    pub map: Map
+    pub map: Map,
 }
 
 impl World {
@@ -40,18 +40,23 @@ impl World {
     pub async fn broadcast_packet(&self, packet: &(impl Packet + Sync)) -> Result<()> {
         // TODO: Use a async RW lock.
         let mut players = self.players.lock().await;
-        let iter = players.values_mut().map(|player| {
-            player.send_packet(packet)
-        });
+        let iter = players
+            .values_mut()
+            .map(|player| player.send_packet(packet));
         futures::future::join_all(iter).await;
         Ok(())
     }
 
-    pub async fn broadcast_packet_except(&self, packet: &(impl Packet + Sync), except: &Player) -> Result<()> {
+    pub async fn broadcast_packet_except(
+        &self,
+        packet: &(impl Packet + Sync),
+        except: &Player,
+    ) -> Result<()> {
         let mut players = self.players.lock().await;
-        let iter = players.values_mut()
+        let iter = players
+            .values_mut()
             .filter(|player| &***player != except)
-            .map(|player| { player.send_packet(packet) });
+            .map(|player| player.send_packet(packet));
 
         futures::future::join_all(iter).await;
         Ok(())
@@ -84,15 +89,21 @@ impl World {
 
         // Send the new player info to everybody else.
         let new_player_info = PlayerInfo::new(Action::Add, vec![player.info()]);
-        self.broadcast_packet_except(&new_player_info, &player).await?;
+        self.broadcast_packet_except(&new_player_info, &player)
+            .await?;
 
         // Spawn the new player in everybody else game.
         let spawn_player = SpawnPlayer::new(&player).await;
         self.broadcast_packet_except(&spawn_player, &player).await?;
 
         // Spawn other players in the new player game.
-        for other in self.players.lock().await.values_mut()
-            .filter(|other| &***other != &*player) {
+        for other in self
+            .players
+            .lock()
+            .await
+            .values_mut()
+            .filter(|other| &***other != &*player)
+        {
             let spawn_other = SpawnPlayer::new(&other).await;
             player.send_packet(&spawn_other).await?;
         }
@@ -109,7 +120,7 @@ impl World {
     pub async fn remove_player(&self, player: &Player) -> Result<()> {
         let id = player.id();
         if self.players.lock().await.remove(&id).is_none() {
-            return Ok(())
+            return Ok(());
         }
 
         let destroy = DestroyEntity::single(id);

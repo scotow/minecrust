@@ -1,20 +1,20 @@
-use crate::packets;
-use crate::packets::{LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
+use crate::packets::{Handshake, LoginRequest, Packet, Ping, ServerDescription, StatusRequest};
+use crate::types::{Receive, TAsyncRead, TAsyncWrite};
 use anyhow::Result;
 use futures::prelude::*;
 
 pub struct Fsm<'a> {
     server_description: ServerDescription,
     state: State,
-    reader: &'a mut Box<dyn AsyncRead + Send + Sync + Unpin>,
-    writer: &'a mut Box<dyn AsyncWrite + Send + Sync + Unpin>,
+    reader: &'a mut Box<dyn TAsyncRead>,
+    writer: &'a mut Box<dyn TAsyncWrite>,
 }
 
 impl<'a> Fsm<'a> {
     pub fn from_rw(
         server_description: ServerDescription,
-        reader: &'a mut Box<dyn AsyncRead + Send + Sync + Unpin>,
-        writer: &'a mut Box<dyn AsyncWrite + Send + Sync + Unpin>,
+        reader: &'a mut Box<dyn TAsyncRead>,
+        writer: &'a mut Box<dyn TAsyncWrite>,
     ) -> Self {
         Self {
             server_description,
@@ -68,12 +68,12 @@ impl State {
     pub async fn next(
         self,
         server_description: &ServerDescription,
-        reader: &mut Box<dyn AsyncRead + Send + Sync + Unpin>,
-        writer: &mut Box<dyn AsyncWrite + Send + Sync + Unpin>,
+        reader: &mut Box<dyn TAsyncRead>,
+        writer: &mut Box<dyn TAsyncWrite>,
     ) -> Result<Self> {
         match self {
             State::Handshake => {
-                let handshake = packets::Handshake::parse(reader).await?;
+                let handshake: Handshake = reader.receive().await?;
 
                 Ok(match *handshake.next_state {
                     1 => State::Status,
@@ -82,18 +82,18 @@ impl State {
                 })
             }
             State::Status => {
-                let status_request = StatusRequest::parse(reader).await?;
+                let status_request: StatusRequest = reader.receive().await?;
                 status_request.answer(writer, &server_description).await?;
                 writer.flush().await?;
 
-                let ping = Ping::parse(reader).await?;
+                let ping: Ping = reader.receive().await?;
                 ping.send_packet(writer).await?;
                 writer.flush().await?;
 
                 Ok(State::StatusFinished)
             }
             State::Play => {
-                let login_start = LoginRequest::parse(reader).await?;
+                let login_start: LoginRequest = reader.receive().await?;
                 login_start.answer(writer).await?;
                 writer.flush().await?;
                 Ok(State::Finished(login_start))

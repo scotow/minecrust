@@ -1,6 +1,6 @@
+use super::Packet;
 use crate::impl_packet;
-use crate::packets::Packet;
-use crate::types::{self, Send, Size, Receive, TAsyncRead, TAsyncWrite};
+use crate::types::{self, Receive, Send, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, ensure, Result};
 use serde::Serialize;
 use serde_json::json;
@@ -9,20 +9,6 @@ pub struct StatusRequest {}
 
 impl StatusRequest {
     pub const PACKET_ID: types::VarInt = types::VarInt(0x00);
-
-    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
-        let size: types::VarInt = reader.receive().await?;
-        if *size != 1 {
-            return Err(anyhow!("invalid packet size"));
-        }
-
-        let id: types::VarInt = reader.receive().await?;
-        if *id != *Self::PACKET_ID {
-            return Err(anyhow!("unexpected non request packet id"));
-        }
-
-        Ok(Self {})
-    }
 
     pub async fn answer<W: TAsyncWrite>(
         &self,
@@ -49,6 +35,23 @@ impl StatusRequest {
         Self::PACKET_ID.send(writer).await?;
         info.send(writer).await?;
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl types::FromReader for StatusRequest {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let size: types::VarInt = reader.receive().await?;
+        if *size != 1 {
+            return Err(anyhow!("invalid packet size"));
+        }
+
+        let id: types::VarInt = reader.receive().await?;
+        if *id != *Self::PACKET_ID {
+            return Err(anyhow!("unexpected non request packet id"));
+        }
+
+        Ok(Self {})
     }
 }
 
@@ -88,11 +91,15 @@ pub struct Ping {
     payload: i64,
 }
 
-impl Ping {
-    pub async fn parse<R: Receive>(reader: &mut R) -> Result<Self> {
+impl_packet!(Ping, 0x01);
+
+#[async_trait::async_trait]
+impl types::FromReader for Ping {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let size = reader.receive::<types::VarInt>().await?;
+        let packet_id = Self::PACKET_ID.size();
         ensure!(
-            size == Self::PACKET_ID.size() + 0_i64.size(),
+            size == packet_id + 0_i64.size(),
             "invalid packet size: {}",
             *size
         );
@@ -103,4 +110,3 @@ impl Ping {
         })
     }
 }
-impl_packet!(Ping, 0x01);

@@ -14,10 +14,7 @@ use anyhow::Result;
 pub trait Packet: Size + Send {
     const PACKET_ID: types::VarInt;
 
-    async fn send_packet<W: TAsyncWrite>(
-        &self,
-        writer: &mut W,
-    ) -> Result<()> {
+    async fn send_packet<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         (Self::PACKET_ID.size() + self.size()).send(writer).await?;
         Self::PACKET_ID.send(writer).await?;
         self.send(writer).await?;

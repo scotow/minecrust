@@ -3,7 +3,6 @@ use crate::impl_packet;
 use crate::types::{EntityPosition, VarInt};
 use uuid::Uuid;
 
-
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct SpawnPlayer {
     id: VarInt,

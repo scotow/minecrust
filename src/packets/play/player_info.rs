@@ -1,9 +1,8 @@
-use crate::types::{LengthVec, VarInt, Size, Send, TAsyncWrite};
 use crate::game::player::Info;
 use crate::types;
+use crate::types::{LengthVec, Send, Size, TAsyncWrite, VarInt};
+use crate::{impl_packet, impl_size};
 use anyhow::Result;
-use crate::{impl_size, impl_packet};
-
 
 #[derive(Debug)]
 pub struct PlayerInfo<'a> {
@@ -23,8 +22,8 @@ impl<'a> PlayerInfo<'a> {
 
 impl<'a> Size for PlayerInfo<'a> {
     fn size(&self) -> VarInt {
-        self.action.size() +
-            match self.action {
+        self.action.size()
+            + match self.action {
                 Action::Add => self.info.size(),
                 Action::UpdateGameMode => unimplemented!(),
                 Action::UpdateLatency => unimplemented!(),

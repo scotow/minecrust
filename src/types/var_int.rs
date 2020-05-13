@@ -14,9 +14,11 @@ impl VarInt {
     pub fn new(n: i32) -> Self {
         Self(n)
     }
+}
 
-    /// TODO: delete this in favor of the ReadExtension
-    pub async fn parse(reader: &mut impl Receive) -> Result<Self> {
+#[async_trait::async_trait]
+impl FromReader for VarInt {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let mut read_int: i32 = 0;
         let mut bytes_read: i32 = 0;
         loop {
@@ -29,13 +31,6 @@ impl VarInt {
                 return Err(anyhow!("VarInt bigger than 5 bytes sent"));
             }
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl FromReader for VarInt {
-    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
-        VarInt::parse(reader).await
     }
 }
 

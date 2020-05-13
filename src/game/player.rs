@@ -14,7 +14,9 @@ use crate::packets::play::player_position::{
 use crate::packets::play::{chat_message, player_position::OutPlayerPositionLook};
 use crate::packets::{Packet, ServerDescription};
 use crate::types::chat::Chat;
-use crate::types::{self, Receive, BoolOption, EntityPosition, LengthVec, VarInt};
+use crate::types::{
+    self, BoolOption, EntityPosition, LengthVec, Receive, TAsyncRead, TAsyncWrite, VarInt,
+};
 use anyhow::Result;
 use futures::prelude::*;
 use futures::AsyncWriteExt;
@@ -25,8 +27,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub struct Player {
-    read_stream: Lock<Box<dyn AsyncRead + Send + Sync + Unpin>>,
-    write_stream: Lock<Box<dyn AsyncWrite + Send + Sync + Unpin>>,
+    read_stream: Lock<Box<dyn TAsyncRead>>,
+    write_stream: Lock<Box<dyn TAsyncWrite>>,
     world: &'static World,
     id: types::VarInt,
     info: Info,
@@ -36,13 +38,13 @@ pub struct Player {
 
 impl Player {
     pub async fn new(
-        reader: impl AsyncRead + Send + Sync + Unpin + 'static,
-        writer: impl AsyncWrite + Send + Sync + Unpin + 'static,
+        reader: impl TAsyncRead + 'static,
+        writer: impl TAsyncWrite + 'static,
         server_description: ServerDescription,
         world: &'static World,
     ) -> Result<Option<Self>> {
-        let mut reader: Box<dyn AsyncRead + Send + Sync + Unpin> = Box::new(reader);
-        let mut writer: Box<dyn AsyncWrite + Send + Sync + Unpin> = Box::new(writer);
+        let mut reader: Box<dyn TAsyncRead> = Box::new(reader);
+        let mut writer: Box<dyn TAsyncWrite> = Box::new(writer);
         let fsm = Fsm::from_rw(server_description, &mut reader, &mut writer);
         let login = fsm.play().await?;
         if login.is_none() {
@@ -118,12 +120,12 @@ impl Player {
 
             match packet_id {
                 InChatMessage::PACKET_ID => {
-                    let in_message = InChatMessage::parse(rest_reader).await?;
+                    let in_message: InChatMessage = rest_reader.receive().await?;
                     let out_message = OutChatMessage::from_player_message(&self, in_message);
                     self.world.broadcast_packet(&out_message).await?;
                 }
                 InPlayerPosition::PACKET_ID => {
-                    let in_position = InPlayerPosition::parse(rest_reader).await?;
+                    let in_position: InPlayerPosition = rest_reader.receive().await?;
                     let delta = self.position.lock().await.update_position(&in_position);
 
                     let out_position = OutPosition::from(&self, &delta, in_position.on_ground);
@@ -139,7 +141,8 @@ impl Player {
                     self.send_needed_chunks(4).await?;
                 }
                 InPlayerPositionRotation::PACKET_ID => {
-                    let in_position_rotation = InPlayerPositionRotation::parse(rest_reader).await?;
+                    let in_position_rotation: InPlayerPositionRotation =
+                        rest_reader.receive().await?;
                     let delta = self
                         .position
                         .lock()
@@ -170,7 +173,7 @@ impl Player {
                     self.send_needed_chunks(4).await?;
                 }
                 InPlayerRotation::PACKET_ID => {
-                    let in_rotation = InPlayerRotation::parse(rest_reader).await?;
+                    let in_rotation: InPlayerRotation = rest_reader.receive().await?;
                     self.position.lock().await.update_angle(&in_rotation);
 
                     let out_rotation = OutRotation::from(&self, in_rotation.on_ground).await;
@@ -184,7 +187,7 @@ impl Player {
                         .await?;
                 }
                 PlayerDigging::PACKET_ID => {
-                    let action = PlayerDigging::parse(rest_reader).await?;
+                    let action: PlayerDigging = rest_reader.receive().await?;
                     if let PlayerDigging::FinishedDigging(position, _face) = dbg!(action) {
                         let block_change = BlockChange::new(position.clone(), Block::Air);
                         self.world

@@ -1,6 +1,6 @@
-use std::ops::{Index, IndexMut, Deref};
-use crate::types::{LengthVec, TAsyncWrite, Size, VarInt, Send};
+use crate::types::{LengthVec, Send, Size, TAsyncWrite, VarInt};
 use anyhow::Result;
+use std::ops::{Deref, Index, IndexMut};
 
 #[derive(Debug)]
 pub struct BitArray<T> {
@@ -49,7 +49,7 @@ impl<T: Clone> Clone for BitArray<T> {
     }
 }
 
-impl<'a, T: Deref<Target=[u64]>> BitArray<T> {
+impl<'a, T: Deref<Target = [u64]>> BitArray<T> {
     pub fn as_slice(&'a self) -> &'a [u64] {
         &self.data
     }
@@ -68,7 +68,7 @@ impl<T: Send + std::marker::Send + Unpin + Sync> Send for BitArray<T> {
     }
 }
 
-impl<T: Index<usize, Output=u64> + IndexMut<usize, Output=u64>> BitArray<T> {
+impl<T: Index<usize, Output = u64> + IndexMut<usize, Output = u64>> BitArray<T> {
     pub fn get(&self, position: usize) -> u16 {
         let start_index = position * self.bits_per_value / 64;
         let end_index = ((position + 1) * self.bits_per_value - 1) / 64;
@@ -82,11 +82,13 @@ impl<T: Index<usize, Output=u64> + IndexMut<usize, Output=u64>> BitArray<T> {
         } else {
             let start_bit = start_bit as u128;
 
-            let buffer = ((self.data[start_index + 1] as u128) << 64) | (self.data[start_index] as u128);
+            let buffer =
+                ((self.data[start_index + 1] as u128) << 64) | (self.data[start_index] as u128);
             let mask = !(!0_u128 << self.bits_per_value as u128) << start_bit;
 
             ((buffer & mask) >> start_bit) as u16
-        }.into()
+        }
+        .into()
     }
 
     pub fn set(&mut self, position: usize, value: u16) {
@@ -104,7 +106,9 @@ impl<T: Index<usize, Output=u64> + IndexMut<usize, Output=u64>> BitArray<T> {
             let start_bit = start_bit as u128;
 
             let clear = !(!(!0_u128 << self.bits_per_value as u128) << start_bit);
-            let mut buffer = (((self.data[start_index + 1] as u128) << 64) | (self.data[start_index] as u128)) & clear;
+            let mut buffer = (((self.data[start_index + 1] as u128) << 64)
+                | (self.data[start_index] as u128))
+                & clear;
             buffer |= ((value as u128) << start_bit) & !clear;
 
             self.data[start_index + 1] = (buffer >> 64) as u64;

@@ -1,6 +1,6 @@
 use crate::impl_packet;
 use crate::types;
-use crate::types::{EntityPosition, VarInt, Receive, TAsyncRead};
+use crate::types::{EntityPosition, Receive, TAsyncRead, VarInt};
 use anyhow::Result;
 
 #[derive(Debug, Default, macro_derive::Size, macro_derive::Send)]
@@ -68,25 +68,29 @@ pub struct InPlayerPosition {
 
 impl InPlayerPosition {
     pub const PACKET_ID: VarInt = VarInt(0x11);
+}
 
-    pub async fn parse<R: TAsyncRead >(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl types::FromReader for InPlayerPosition {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let x = reader.receive().await?;
         let y = reader.receive().await?;
         let z = reader.receive().await?;
         let on_ground = reader.receive().await?;
-        Ok(Self {
-            x,
-            y,
-            z,
-            on_ground,
-        })
+        Ok(Self { x, y, z, on_ground })
     }
 }
 
 impl PlayerPositionPacket for InPlayerPosition {
-    fn x(&self) -> f64 { self.x }
-    fn y(&self) -> f64 { self.y }
-    fn z(&self) -> f64 { self.z }
+    fn x(&self) -> f64 {
+        self.x
+    }
+    fn y(&self) -> f64 {
+        self.y
+    }
+    fn z(&self) -> f64 {
+        self.z
+    }
 }
 
 #[derive(Debug)]
@@ -101,8 +105,11 @@ pub struct InPlayerPositionRotation {
 
 impl InPlayerPositionRotation {
     pub const PACKET_ID: VarInt = VarInt(0x12);
+}
 
-    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl types::FromReader for InPlayerPositionRotation {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let x = reader.receive().await?;
         let y = reader.receive().await?;
         let z = reader.receive().await?;
@@ -121,14 +128,24 @@ impl InPlayerPositionRotation {
 }
 
 impl PlayerPositionPacket for InPlayerPositionRotation {
-    fn x(&self) -> f64 { self.x }
-    fn y(&self) -> f64 { self.y }
-    fn z(&self) -> f64 { self.z }
+    fn x(&self) -> f64 {
+        self.x
+    }
+    fn y(&self) -> f64 {
+        self.y
+    }
+    fn z(&self) -> f64 {
+        self.z
+    }
 }
 
 impl PlayerRotationPacket for InPlayerPositionRotation {
-    fn x_angle(&self) -> f32 { self.x_angle }
-    fn z_angle(&self) -> f32 { self.z_angle }
+    fn x_angle(&self) -> f32 {
+        self.x_angle
+    }
+    fn z_angle(&self) -> f32 {
+        self.z_angle
+    }
 }
 
 #[derive(Debug)]
@@ -140,8 +157,11 @@ pub struct InPlayerRotation {
 
 impl InPlayerRotation {
     pub const PACKET_ID: VarInt = VarInt(0x13);
+}
 
-    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl types::FromReader for InPlayerRotation {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let x_angle = reader.receive().await?;
         let z_angle = reader.receive().await?;
         let on_ground = reader.receive().await?;
@@ -154,6 +174,10 @@ impl InPlayerRotation {
 }
 
 impl PlayerRotationPacket for InPlayerRotation {
-    fn x_angle(&self) -> f32 { self.x_angle }
-    fn z_angle(&self) -> f32 { self.z_angle }
+    fn x_angle(&self) -> f32 {
+        self.x_angle
+    }
+    fn z_angle(&self) -> f32 {
+        self.z_angle
+    }
 }

@@ -1,10 +1,10 @@
-use crate::types::{self, LengthVec, Size, VarInt, BitArray, TAsyncWrite};
+use crate::packets::play::block::Block;
+use crate::types::{self, BitArray, LengthVec, Size, TAsyncWrite, VarInt};
+use crate::{impl_send, impl_size};
 use anyhow::Result;
 use nbt::Blob;
 use std::fmt::{self, Debug};
-use crate::{impl_size, impl_send};
 use std::ops::Add;
-use crate::packets::play::block::Block;
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -14,7 +14,7 @@ pub struct Chunk {
     biomes: Biomes,
     sections: [Option<ChunkSection>; 16],
 }
-crate ::impl_packet!(Chunk, 0x22);
+crate::impl_packet!(Chunk, 0x22);
 
 impl Chunk {
     pub fn new(x: i32, z: i32) -> Self {
@@ -62,8 +62,8 @@ impl Chunk {
                 let section = ChunkSection::new();
                 self.sections[section_index] = Some(section);
                 self.sections[section_index].as_mut().unwrap()
-            },
-            (Some(s), _) => s
+            }
+            (Some(s), _) => s,
         };
 
         // Set block in section.
@@ -88,7 +88,8 @@ impl types::Size for Chunk {
     fn size(&self) -> types::VarInt {
         let sections_size = self.sections.size();
 
-        self.x.size() + self.z.size()
+        self.x.size()
+            + self.z.size()
             + true.size()
             + self.bitmask().size()
             + self.heightmap.size()
@@ -143,7 +144,8 @@ impl From<&Heightmap> for Blob {
     fn from(heightmap: &Heightmap) -> Self {
         let data: Vec<i64> = heightmap.0.as_slice().iter().map(|v| *v as i64).collect();
         let mut blob = nbt::Blob::new();
-        blob.insert(Heightmap::MOTION_BLOCKING_KEY.to_string(), data).expect("invalid NBT array");
+        blob.insert(Heightmap::MOTION_BLOCKING_KEY.to_string(), data)
+            .expect("invalid NBT array");
         blob
     }
 }
@@ -183,13 +185,15 @@ impl ChunkSection {
     }
 
     pub fn get(&self, x: u8, y: u8, z: u8) -> Block {
-        self.data.get(y as usize * 256 + z as usize * 16 + x as usize).into()
+        self.data
+            .get(y as usize * 256 + z as usize * 16 + x as usize)
+            .into()
     }
 
     pub fn set(&mut self, x: u8, y: u8, z: u8, new: Block) {
         let old = self.get(x, y, z);
         if old == new {
-            return
+            return;
         }
 
         if new == Block::Air {
@@ -198,7 +202,8 @@ impl ChunkSection {
             self.block_count += 1;
         }
 
-        self.data.set(y as usize * 256 + z as usize * 16 + x as usize, new as u16);
+        self.data
+            .set(y as usize * 256 + z as usize * 16 + x as usize, new as u16);
     }
 }
 
@@ -300,7 +305,7 @@ mod tests {
         1155177711073787968,
         577588855536893984,
         288794427768446992,
-        144397213884223496
+        144397213884223496,
     ];
 
     #[test]

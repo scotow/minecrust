@@ -1,7 +1,5 @@
 use crate::game::player::Player;
-use crate::types;
-use crate::types::chat::Chat;
-use crate::types::{VarInt, TAsyncRead, Receive};
+use crate::types::{self, chat::Chat, Receive, TAsyncRead, VarInt};
 use crate::{impl_packet, impl_send, impl_size};
 use anyhow::Result;
 
@@ -9,8 +7,11 @@ pub struct InChatMessage(types::String);
 
 impl InChatMessage {
     pub const PACKET_ID: VarInt = VarInt(0x03);
+}
 
-    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl types::FromReader for InChatMessage {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let content = reader.receive().await?;
         Ok(Self(content))
     }

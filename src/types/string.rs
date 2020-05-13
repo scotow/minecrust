@@ -13,9 +13,11 @@ impl String {
     pub fn new(s: &str) -> Self {
         Self(s.to_string())
     }
+}
 
-    /// TODO: delete this in favor of the ReadExtension
-    pub async fn parse(reader: &mut impl TAsyncRead) -> Result<Self> {
+#[async_trait::async_trait]
+impl FromReader for String {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         let mut result = StdString::new();
         let size = reader.receive::<types::VarInt>().await?;
         let read = reader
@@ -27,13 +29,6 @@ impl String {
         } else {
             Ok(Self::new(&result))
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl FromReader for String {
-    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
-        String::parse(reader).await
     }
 }
 
