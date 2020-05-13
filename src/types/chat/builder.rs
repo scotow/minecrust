@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use crate::types::chat::Chat;
 use serde_json::Value;
+use std::collections::HashSet;
 
 /// ```
 /// use minecrust::types::chat::*;
@@ -61,7 +61,7 @@ impl ChatBuilder {
         use ContentType::*;
         match &self.content_type {
             Text(s) => map.insert("text".to_string(), Value::String(s.clone())),
-            Template(t) => map.insert("translate".to_string(), Value::String(t.clone()))
+            Template(t) => map.insert("translate".to_string(), Value::String(t.clone())),
         };
 
         // Attributes.
@@ -72,9 +72,15 @@ impl ChatBuilder {
         if !self.components.is_empty() {
             let key = match self.content_type {
                 Text(_) => "extra",
-                Template(_) => "with"
-            }.to_string();
-            let components = Value::Array(self.components.into_iter().map(ChatComponent::build).collect());
+                Template(_) => "with",
+            }
+            .to_string();
+            let components = Value::Array(
+                self.components
+                    .into_iter()
+                    .map(ChatComponent::build)
+                    .collect(),
+            );
 
             map.insert(key, components);
         }
@@ -135,8 +141,9 @@ impl Attribute {
             Underlined => "underlined",
             Strikethrough => "strikethrough",
             Obfuscated => "obfuscated",
-            Color(_) => "color"
-        }.to_string()
+            Color(_) => "color",
+        }
+        .to_string()
     }
 
     pub(self) fn value(&self) -> Value {
@@ -147,8 +154,10 @@ impl Attribute {
             Underlined => "true",
             Strikethrough => "true",
             Obfuscated => "true",
-            Color(c) => c.value()
-        }.to_string().into()
+            Color(c) => c.value(),
+        }
+        .to_string()
+        .into()
     }
 }
 
@@ -193,7 +202,7 @@ impl Color {
             Pink => "light_purple",
             Yellow => "yellow",
             White => "white",
-            Reset => "reset"
+            Reset => "reset",
         }
     }
 }

@@ -8,4 +8,4 @@ impl DestroyEntity {
         Self(LengthVec::from(vec![id]))
     }
 }
-crate ::impl_packet!(DestroyEntity, 0x38);
+crate::impl_packet!(DestroyEntity, 0x38);

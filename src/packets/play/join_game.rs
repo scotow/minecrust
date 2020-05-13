@@ -1,11 +1,8 @@
-use futures::AsyncWrite;
+use crate::types::{self, Size, TAsyncWrite, VarInt};
+use crate::{impl_packet, impl_send, impl_size};
+use anyhow::Result;
 use std::fmt::{self, Display, Formatter};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use anyhow::Result;
-
-use crate::types::{self, Size, VarInt};
-use crate::{impl_packet, impl_send, impl_size};
 
 #[derive(macro_derive::Size, macro_derive::Send, Debug)]
 pub struct JoinGame {
@@ -101,7 +98,7 @@ impl Size for LevelType {
 
 #[async_trait::async_trait]
 impl types::Send for LevelType {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         types::String::new(&self.to_string()).send(writer).await
     }
 }

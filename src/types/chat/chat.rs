@@ -1,5 +1,5 @@
 use crate::types;
-use crate::types::chat::{ChatBuilder, ChatComponent, Attribute, Color};
+use crate::types::chat::{Attribute, ChatBuilder, ChatComponent, Color};
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct Chat(types::String);

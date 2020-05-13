@@ -1,5 +1,5 @@
-mod chat;
 mod builder;
+mod chat;
 
-pub use chat::*;
 pub use builder::*;
+pub use chat::*;

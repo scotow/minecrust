@@ -1,8 +1,5 @@
-use crate::types::VarInt;
-use futures::AsyncRead;
-use anyhow::{Result, ensure};
-use crate::stream::ReadExtension;
-use crate::types::BlockPosition;
+use crate::types::{self, BlockPosition, Receive, TAsyncRead, VarInt};
+use anyhow::{ensure, Result};
 
 #[derive(Debug)]
 pub enum PlayerDigging {
@@ -17,30 +14,31 @@ pub enum PlayerDigging {
 
 impl PlayerDigging {
     pub const PACKET_ID: VarInt = VarInt(0x1A);
+}
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let status = reader.read_var_int().await?;
+#[async_trait::async_trait]
+impl types::FromReader for PlayerDigging {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let status: VarInt = reader.receive().await?;
         ensure!((0..=6).contains(&*status), "invalid status");
 
-        let location = reader.read_block_position().await?;
+        let location: BlockPosition = reader.receive().await?;
 
-        let face = reader.read_u8().await?;
+        let face = reader.receive::<u8>().await?;
         ensure!((0..=5).contains(&face), "invalid face");
         let face = Face::from(face);
 
         use PlayerDigging::*;
-        Ok(
-            match *status {
-                0 => StartedDigging(location, face),
-                1 => CancelledDigging(location, face),
-                2 => FinishedDigging(location, face),
-                3 => DropStackItem,
-                4 => DropItem,
-                5 => UsingItem,
-                6 => SwapItem,
-                _ => unreachable!()
-            }
-        )
+        Ok(match *status {
+            0 => StartedDigging(location, face),
+            1 => CancelledDigging(location, face),
+            2 => FinishedDigging(location, face),
+            3 => DropStackItem,
+            4 => DropItem,
+            5 => UsingItem,
+            6 => SwapItem,
+            _ => unreachable!(),
+        })
     }
 }
 

@@ -1,9 +1,5 @@
-use crate::types::{VarInt, PositionDelta};
 use crate::game::player::Player;
-
-
-
-
+use crate::types::{PositionDelta, VarInt};
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
 pub struct OutPosition {
@@ -13,7 +9,7 @@ pub struct OutPosition {
     delta_z: i16,
     on_ground: bool,
 }
-crate ::impl_packet!(OutPosition, 0x29);
+crate::impl_packet!(OutPosition, 0x29);
 
 impl OutPosition {
     pub fn from(player: &Player, delta: &PositionDelta, on_ground: bool) -> Self {
@@ -37,7 +33,7 @@ pub struct OutPositionRotation {
     z_angle: u8,
     on_ground: bool,
 }
-crate ::impl_packet!(OutPositionRotation, 0x2A);
+crate::impl_packet!(OutPositionRotation, 0x2A);
 
 impl OutPositionRotation {
     pub async fn from(player: &Player, delta: &PositionDelta, on_ground: bool) -> Self {
@@ -61,7 +57,7 @@ pub struct OutRotation {
     z_angle: u8,
     on_ground: bool,
 }
-crate ::impl_packet!(OutRotation, 0x2B);
+crate::impl_packet!(OutRotation, 0x2B);
 
 impl OutRotation {
     pub async fn from(player: &Player, on_ground: bool) -> Self {
@@ -80,7 +76,7 @@ pub struct OutEntityHeadLook {
     id: VarInt,
     x_angle: u8,
 }
-crate ::impl_packet!(OutEntityHeadLook, 0x3C);
+crate::impl_packet!(OutEntityHeadLook, 0x3C);
 
 impl OutEntityHeadLook {
     pub async fn from(player: &Player) -> Self {

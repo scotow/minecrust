@@ -2,7 +2,6 @@ use crate::types;
 use crate::types::VarInt;
 use std::ops::Add;
 
-
 pub trait Size {
     fn size(&self) -> types::VarInt;
 }

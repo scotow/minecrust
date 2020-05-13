@@ -1,12 +1,11 @@
+use super::TAsyncWrite;
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::prelude::*;
-use futures::AsyncWriteExt;
-
 
 #[async_trait]
 pub trait Send {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()>;
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()>;
 }
 
 macro_rules! _impl_send_primitives {
@@ -14,7 +13,7 @@ macro_rules! _impl_send_primitives {
         $(
             #[async_trait]
             impl Send for $type {
-                async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+                async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
                     writer.write_all(&self.to_be_bytes()).await?;
                     Ok(())
                 }
@@ -30,7 +29,7 @@ macro_rules! impl_send {
     ($type:tt $(as $repr:tt)+) => {
         #[async_trait::async_trait]
         impl $crate::types::Send for $type {
-            async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(
+            async fn send<W: $crate::types::TAsyncWrite>(
                 &self,
                 writer: &mut W,
             ) -> anyhow::Result<()> {
@@ -42,7 +41,7 @@ macro_rules! impl_send {
 
         #[async_trait::async_trait]
         impl $crate::types::Send for &$type {
-            async fn send<W: futures::prelude::AsyncWrite + std::marker::Send + Unpin>(
+            async fn send<W: $crate::types::TAsyncWrite>(
                 &self,
                 writer: &mut W,
             ) -> anyhow::Result<()> {
@@ -64,14 +63,14 @@ macro_rules! impl_send {
 
 #[async_trait]
 impl Send for bool {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         (*self as u8).send(writer).await
     }
 }
 
 #[async_trait]
 impl<T: Send + Sync> Send for Option<T> {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         match self {
             Some(t) => t.send(writer).await,
             None => Ok(()),
@@ -81,7 +80,7 @@ impl<T: Send + Sync> Send for Option<T> {
 
 #[async_trait]
 impl<T: Send + Sync> Send for Vec<T> {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         // TODO: use write_all instead of .iter
         for i in self.iter() {
             i.send(writer).await?;

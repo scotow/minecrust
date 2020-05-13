@@ -1,3 +1,3 @@
-pub mod world;
-pub mod player;
 pub mod map;
+pub mod player;
+pub mod world;

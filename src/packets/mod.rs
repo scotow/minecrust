@@ -7,18 +7,14 @@ pub use handshake::*;
 pub use login::*;
 pub use status::*;
 
-use crate::types::{self, Send, Size};
+use crate::types::{self, Send, Size, TAsyncWrite};
 use anyhow::Result;
-use futures::AsyncWrite;
 
 #[async_trait::async_trait]
 pub trait Packet: Size + Send {
     const PACKET_ID: types::VarInt;
 
-    async fn send_packet<W: AsyncWrite + Unpin + std::marker::Send>(
-        &self,
-        writer: &mut W,
-    ) -> Result<()> {
+    async fn send_packet<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         (Self::PACKET_ID.size() + self.size()).send(writer).await?;
         Self::PACKET_ID.send(writer).await?;
         self.send(writer).await?;

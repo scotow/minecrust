@@ -1,33 +1,16 @@
+use super::Packet;
 use crate::impl_packet;
-use crate::packets::Packet;
-use crate::stream::ReadExtension;
-use crate::types::{self, Send, Size};
+use crate::types::{self, Receive, Send, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, ensure, Result};
-use futures::prelude::*;
 use serde::Serialize;
 use serde_json::json;
-use std::marker::Unpin;
 
 pub struct StatusRequest {}
 
 impl StatusRequest {
     pub const PACKET_ID: types::VarInt = types::VarInt(0x00);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let size = reader.read_var_int().await?;
-        if *size != 1 {
-            return Err(anyhow!("invalid packet size"));
-        }
-
-        let id = reader.read_var_int().await?;
-        if *id != *Self::PACKET_ID {
-            return Err(anyhow!("unexpected non request packet id"));
-        }
-
-        Ok(Self {})
-    }
-
-    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(
+    pub async fn answer<W: TAsyncWrite>(
         &self,
         writer: &mut W,
         description: &ServerDescription,
@@ -52,6 +35,23 @@ impl StatusRequest {
         Self::PACKET_ID.send(writer).await?;
         info.send(writer).await?;
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl types::FromReader for StatusRequest {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let size: types::VarInt = reader.receive().await?;
+        if *size != 1 {
+            return Err(anyhow!("invalid packet size"));
+        }
+
+        let id: types::VarInt = reader.receive().await?;
+        if *id != *Self::PACKET_ID {
+            return Err(anyhow!("unexpected non request packet id"));
+        }
+
+        Ok(Self {})
     }
 }
 
@@ -91,19 +91,22 @@ pub struct Ping {
     payload: i64,
 }
 
-impl Ping {
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let size = reader.read_var_int().await?;
+impl_packet!(Ping, 0x01);
+
+#[async_trait::async_trait]
+impl types::FromReader for Ping {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let size = reader.receive::<types::VarInt>().await?;
+        let packet_id = Self::PACKET_ID.size();
         ensure!(
-            size == Self::PACKET_ID.size() + 0_i64.size(),
+            size == packet_id + 0_i64.size(),
             "invalid packet size: {}",
             *size
         );
 
-        let _id = reader.read_var_int().await?;
+        let _id: types::VarInt = reader.receive().await?;
         Ok(Self {
-            payload: reader.read_i64().await?,
+            payload: reader.receive().await?,
         })
     }
 }
-impl_packet!(Ping, 0x01);
