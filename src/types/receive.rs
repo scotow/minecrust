@@ -4,12 +4,15 @@ use anyhow::Result;
 /// This trait is used to parse, read or receive data over an AsyncReader.
 /// Here is an example of implementation for `i32`:
 /// ```
+/// use minecrust::types::{FromReader, TAsyncRead, Receive};
+/// use anyhow::Result;
+///
+/// struct MyStruct(i32);
+///
 /// #[async_trait::async_trait]
-/// impl FromReader for i32 {
-///     async fn from_reader(reader: &mut impl TAsyncRead) -> Result<Self> {
-///         let mut buff = [0; 4];
-///         reader.read_exact(&mut buff).await?;
-///         Ok(i32::from_be_bytes(buff))
+/// impl FromReader for MyStruct {
+///     async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+///         Ok(MyStruct(reader.receive().await?))
 ///     }
 /// }
 /// ```
