@@ -1,10 +1,8 @@
 use crate::types::{FromReader, Receive, Send, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use futures::prelude::*;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::marker::Unpin;
 use std::ops::{Add, Deref};
 
 #[derive(Debug, Copy, Clone, Default, Ord, PartialOrd, PartialEq, Eq, Hash)]
@@ -36,7 +34,7 @@ impl VarInt {
 
 #[async_trait::async_trait]
 impl FromReader for VarInt {
-    async fn from_reader(reader: &mut impl TAsyncRead) -> Result<Self> {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         VarInt::parse(reader).await
     }
 }
@@ -53,7 +51,7 @@ impl Size for VarInt {
 
 #[async_trait]
 impl Send for VarInt {
-    async fn send(&self, writer: &mut impl TAsyncWrite) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         let mut n = self.0 as u32;
         loop {
             let tmp = n as u8 & 0b0111_1111;

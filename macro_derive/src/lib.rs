@@ -1,7 +1,6 @@
 extern crate proc_macro;
 
 use quote::quote;
-
 use syn::{parse_macro_input, DeriveInput};
 
 mod send;
@@ -22,7 +21,7 @@ pub fn derive_send(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         // The generated impl.
         #[async_trait::async_trait]
         impl #impl_generics crate::types::Send for #struct_name #ty_generics #where_clause {
-            async fn send<W: futures::io::AsyncWrite + std::marker::Send + std::marker::Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
+            async fn send<W: futures::io::AsyncWrite + std::marker::Send + std::marker::Sync + std::marker::Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
                 use crate::types::Send;
                 #send
                 Ok(())
@@ -31,7 +30,7 @@ pub fn derive_send(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         #[async_trait::async_trait]
         impl #impl_generics crate::types::Send for &#struct_name #ty_generics #where_clause {
-            async fn send<W: futures::io::AsyncWrite + std::marker::Send + std::marker::Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
+            async fn send<W: futures::io::AsyncWrite + std::marker::Send + std::marker::Sync + std::marker::Unpin>(&self, writer: &mut W) -> anyhow::Result<()> {
                 use crate::types::Send;
                 #send
                 Ok(())

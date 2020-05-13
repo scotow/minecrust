@@ -1,7 +1,6 @@
-use crate::types::{LengthVec, VarInt, Size, Send};
+use crate::types::{LengthVec, VarInt, Size, Send, TAsyncWrite};
 use crate::game::player::Info;
 use crate::types;
-use futures::AsyncWrite;
 use anyhow::Result;
 use crate::{impl_size, impl_packet};
 
@@ -40,7 +39,7 @@ impl<'a> Size for PlayerInfo<'a> {
 
 #[async_trait::async_trait]
 impl<'a> Send for PlayerInfo<'a> {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         self.action.send(writer).await?;
         match self.action {
             Action::Add => self.info.send(writer).await?,
@@ -71,7 +70,7 @@ impl_size!(Action, 1);
 
 #[async_trait::async_trait]
 impl types::Send for Action {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         VarInt(*self as i32).send(writer).await
     }
 }

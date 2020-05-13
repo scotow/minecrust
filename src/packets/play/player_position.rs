@@ -1,9 +1,7 @@
 use crate::impl_packet;
 use crate::types;
-use crate::types::{EntityPosition, VarInt};
-use futures::AsyncRead;
+use crate::types::{EntityPosition, VarInt, Receive, TAsyncRead};
 use anyhow::Result;
-use crate::stream::ReadExtension;
 
 #[derive(Debug, Default, macro_derive::Size, macro_derive::Send)]
 pub struct OutPlayerPositionLook {
@@ -71,11 +69,11 @@ pub struct InPlayerPosition {
 impl InPlayerPosition {
     pub const PACKET_ID: VarInt = VarInt(0x11);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let x = reader.read_f64().await?;
-        let y = reader.read_f64().await?;
-        let z = reader.read_f64().await?;
-        let on_ground = reader.read_bool().await?;
+    pub async fn parse<R: TAsyncRead >(reader: &mut R) -> Result<Self> {
+        let x = reader.receive().await?;
+        let y = reader.receive().await?;
+        let z = reader.receive().await?;
+        let on_ground = reader.receive().await?;
         Ok(Self {
             x,
             y,
@@ -104,13 +102,13 @@ pub struct InPlayerPositionRotation {
 impl InPlayerPositionRotation {
     pub const PACKET_ID: VarInt = VarInt(0x12);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let x = reader.read_f64().await?;
-        let y = reader.read_f64().await?;
-        let z = reader.read_f64().await?;
-        let x_angle = reader.read_f32().await?;
-        let z_angle = reader.read_f32().await?;
-        let on_ground = reader.read_bool().await?;
+    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let x = reader.receive().await?;
+        let y = reader.receive().await?;
+        let z = reader.receive().await?;
+        let x_angle = reader.receive().await?;
+        let z_angle = reader.receive().await?;
+        let on_ground = reader.receive().await?;
         Ok(Self {
             x,
             y,
@@ -143,10 +141,10 @@ pub struct InPlayerRotation {
 impl InPlayerRotation {
     pub const PACKET_ID: VarInt = VarInt(0x13);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let x_angle = reader.read_f32().await?;
-        let z_angle = reader.read_f32().await?;
-        let on_ground = reader.read_bool().await?;
+    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let x_angle = reader.receive().await?;
+        let z_angle = reader.receive().await?;
+        let on_ground = reader.receive().await?;
         Ok(Self {
             x_angle,
             z_angle,

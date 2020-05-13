@@ -1,25 +1,22 @@
 use crate::impl_packet;
 use crate::packets::Packet;
-use crate::stream::ReadExtension;
-use crate::types::{self, Send, Size};
+use crate::types::{self, Send, Size, Receive, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, ensure, Result};
-use futures::prelude::*;
 use serde::Serialize;
 use serde_json::json;
-use std::marker::Unpin;
 
 pub struct StatusRequest {}
 
 impl StatusRequest {
     pub const PACKET_ID: types::VarInt = types::VarInt(0x00);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let size = reader.read_var_int().await?;
+    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let size: types::VarInt = reader.receive().await?;
         if *size != 1 {
             return Err(anyhow!("invalid packet size"));
         }
 
-        let id = reader.read_var_int().await?;
+        let id: types::VarInt = reader.receive().await?;
         if *id != *Self::PACKET_ID {
             return Err(anyhow!("unexpected non request packet id"));
         }
@@ -27,7 +24,7 @@ impl StatusRequest {
         Ok(Self {})
     }
 
-    pub async fn answer<W: AsyncWrite + Unpin + std::marker::Send>(
+    pub async fn answer<W: TAsyncWrite>(
         &self,
         writer: &mut W,
         description: &ServerDescription,
@@ -92,17 +89,17 @@ pub struct Ping {
 }
 
 impl Ping {
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let size = reader.read_var_int().await?;
+    pub async fn parse<R: Receive>(reader: &mut R) -> Result<Self> {
+        let size = reader.receive::<types::VarInt>().await?;
         ensure!(
             size == Self::PACKET_ID.size() + 0_i64.size(),
             "invalid packet size: {}",
             *size
         );
 
-        let _id = reader.read_var_int().await?;
+        let _id: types::VarInt = reader.receive().await?;
         Ok(Self {
-            payload: reader.read_i64().await?,
+            payload: reader.receive().await?,
         })
     }
 }

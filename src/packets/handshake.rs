@@ -1,8 +1,5 @@
 use futures::prelude::*;
-use std::marker::Unpin;
-
-use crate::stream::ReadExtension;
-use crate::types;
+use crate::types::{self, TAsyncRead, Receive};
 use anyhow::{anyhow, Result};
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]
@@ -31,20 +28,20 @@ impl Handshake {
         }
     }
 
-    pub async fn parse<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self> {
-        let size = reader.read_var_int().await?;
+    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let size: types::VarInt = reader.receive().await?;
         let mut reader = reader.take(*size as u64);
 
-        let id = reader.read_var_int().await?;
+        let id: types::VarInt = reader.receive().await?;
         if *id != *Self::PACKET_ID {
             return Err(anyhow!("unexpected non handshake packet id"));
         }
 
         let handshake = Self::new(
-            reader.read_var_int().await?,
-            reader.read_string().await?,
-            reader.read_u16().await?,
-            reader.read_var_int().await?,
+            reader.receive().await?,
+            reader.receive().await?,
+            reader.receive().await?,
+            reader.receive().await?,
         );
 
         if !(1..=2).contains(&*handshake.next_state) {

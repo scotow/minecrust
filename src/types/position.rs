@@ -97,7 +97,7 @@ crate::impl_size!(BlockPosition, 8);
 
 #[async_trait::async_trait]
 impl Send for BlockPosition {
-    async fn send(&self, writer: &mut impl TAsyncWrite) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         let n = ((self.x as u32 as u64 & 0x3FFFFFF) << 38)
             | ((self.z as u32 as u64 & 0x3FFFFFF) << 12)
             | (self.y as u64 & 0xFFF);
@@ -113,8 +113,11 @@ impl BlockPosition {
     pub fn from_u64(n: u64) -> Self {
         Self::new((n >> 38) as i32, (n & 0xFFF) as u16, (n << 26 >> 38) as i32)
     }
+}
 
-    pub async fn parse<R: Receive>(reader: &mut R) -> Result<Self> {
+#[async_trait::async_trait]
+impl crate::types::FromReader for BlockPosition {
+    async fn from_reader<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
         Ok(reader.receive::<u64>().await?.into())
     }
 }

@@ -1,6 +1,5 @@
 use std::ops::{Index, IndexMut, Deref};
-use crate::types::{LengthVec, Size, VarInt, Send};
-use futures::AsyncWrite;
+use crate::types::{LengthVec, TAsyncWrite, Size, VarInt, Send};
 use anyhow::Result;
 
 #[derive(Debug)]
@@ -64,7 +63,7 @@ impl<T: Size> Size for BitArray<T> {
 
 #[async_trait::async_trait]
 impl<T: Send + std::marker::Send + Unpin + Sync> Send for BitArray<T> {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         self.data.send(writer).await
     }
 }

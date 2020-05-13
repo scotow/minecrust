@@ -1,19 +1,17 @@
 use crate::game::player::Player;
-use crate::stream::ReadExtension;
 use crate::types;
 use crate::types::chat::Chat;
-use crate::types::VarInt;
+use crate::types::{VarInt, TAsyncRead, Receive};
 use crate::{impl_packet, impl_send, impl_size};
 use anyhow::Result;
-use futures::AsyncRead;
 
 pub struct InChatMessage(types::String);
 
 impl InChatMessage {
     pub const PACKET_ID: VarInt = VarInt(0x03);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let content = reader.read_string().await?;
+    pub async fn parse<R: TAsyncRead>(reader: &mut R) -> Result<Self> {
+        let content = reader.receive().await?;
         Ok(Self(content))
     }
 }

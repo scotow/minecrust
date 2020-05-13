@@ -1,6 +1,5 @@
-use crate::types::{self, LengthVec, Size, VarInt, BitArray};
+use crate::types::{self, LengthVec, Size, VarInt, BitArray, TAsyncWrite};
 use anyhow::Result;
-use futures::prelude::*;
 use nbt::Blob;
 use std::fmt::{self, Debug};
 use crate::{impl_size, impl_send};
@@ -102,7 +101,7 @@ impl types::Size for Chunk {
 
 #[async_trait::async_trait]
 impl types::Send for Chunk {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         self.x.send(writer).await?;
         self.z.send(writer).await?;
         true.send(writer).await?;
@@ -158,7 +157,7 @@ impl types::Size for Heightmap {
 
 #[async_trait::async_trait]
 impl types::Send for Heightmap {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         let mut vec = Vec::with_capacity(*self.size() as usize);
         Blob::from(self).to_writer(&mut vec)?;
         vec.send(writer).await
@@ -211,7 +210,7 @@ impl Size for [Option<ChunkSection>; 16] {
 
 #[async_trait::async_trait]
 impl types::Send for [Option<ChunkSection>; 16] {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         for section in self.iter().filter_map(|s| s.as_ref()) {
             section.send(writer).await?;
         }
@@ -242,7 +241,7 @@ impl types::Size for Biomes {
 
 #[async_trait::async_trait]
 impl types::Send for Biomes {
-    async fn send<W: AsyncWrite + std::marker::Send + Unpin>(&self, writer: &mut W) -> Result<()> {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         for biome in self.0.iter() {
             (*biome as i32).send(writer).await?;
         }

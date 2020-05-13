@@ -13,9 +13,8 @@ use crate::packets::play::player_position::{
 };
 use crate::packets::play::{chat_message, player_position::OutPlayerPositionLook};
 use crate::packets::{Packet, ServerDescription};
-use crate::stream::ReadExtension;
 use crate::types::chat::Chat;
-use crate::types::{self, BoolOption, EntityPosition, LengthVec, VarInt};
+use crate::types::{self, Receive, BoolOption, EntityPosition, LengthVec, VarInt};
 use anyhow::Result;
 use futures::prelude::*;
 use futures::AsyncWriteExt;
@@ -112,10 +111,10 @@ impl Player {
 
     async fn handle_packet(&self) -> Result<()> {
         loop {
-            let size = self.read_stream.lock().await.read_var_int().await?;
+            let size: types::VarInt = self.read_stream.lock().await.receive().await?;
             let rest_reader = &mut *self.read_stream.lock().await;
             let rest_reader = &mut rest_reader.take(*size as u64);
-            let packet_id = rest_reader.read_var_int().await?;
+            let packet_id: types::VarInt = rest_reader.receive().await?;
 
             match packet_id {
                 InChatMessage::PACKET_ID => {

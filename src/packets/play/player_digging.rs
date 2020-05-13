@@ -1,8 +1,6 @@
 use crate::types::VarInt;
-use futures::AsyncRead;
 use anyhow::{Result, ensure};
-use crate::stream::ReadExtension;
-use crate::types::BlockPosition;
+use crate::types::{BlockPosition, Receive};
 
 #[derive(Debug)]
 pub enum PlayerDigging {
@@ -18,13 +16,13 @@ pub enum PlayerDigging {
 impl PlayerDigging {
     pub const PACKET_ID: VarInt = VarInt(0x1A);
 
-    pub async fn parse<R: AsyncRead + Unpin + std::marker::Send>(reader: &mut R) -> Result<Self> {
-        let status = reader.read_var_int().await?;
+    pub async fn parse<R: Receive>(reader: &mut R) -> Result<Self> {
+        let status: VarInt = reader.receive().await?;
         ensure!((0..=6).contains(&*status), "invalid status");
 
-        let location = reader.read_block_position().await?;
+        let location: BlockPosition = reader.receive().await?;
 
-        let face = reader.read_u8().await?;
+        let face = reader.receive::<u8>().await?;
         ensure!((0..=5).contains(&face), "invalid face");
         let face = Face::from(face);
 
