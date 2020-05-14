@@ -79,7 +79,7 @@ impl<T: Send + Sync> Send for Option<T> {
 }
 
 #[async_trait]
-impl<T: Send + Sync> Send for Vec<T> {
+impl<T: Send + Sync> Send for [T] {
     async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         // TODO: use write_all instead of .iter
         for i in self.iter() {

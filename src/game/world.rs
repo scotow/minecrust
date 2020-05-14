@@ -102,7 +102,7 @@ impl World {
             .lock()
             .await
             .values_mut()
-            .filter(|other| &***other != &*player)
+            .filter(|other| ***other != *player)
         {
             let spawn_other = SpawnPlayer::new(&other).await;
             player.send_packet(&spawn_other).await?;

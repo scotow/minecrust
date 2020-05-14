@@ -60,9 +60,15 @@ pub enum State {
     Finished(LoginRequest),
 }
 
+impl Default for State {
+    fn default() -> Self {
+        State::Handshake
+    }
+}
+
 impl State {
     pub fn new() -> Self {
-        State::Handshake
+        Default::default()
     }
 
     pub async fn next(

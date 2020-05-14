@@ -20,7 +20,6 @@ use std::collections::HashSet;
 ///         )
 ///         .build();
 /// ```
-
 pub struct ChatBuilder {
     content_type: ContentType,
     attributes: HashSet<Attribute>,

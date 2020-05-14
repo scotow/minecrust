@@ -88,7 +88,6 @@ impl<T: Index<usize, Output = u64> + IndexMut<usize, Output = u64>> BitArray<T> 
 
             ((buffer & mask) >> start_bit) as u16
         }
-        .into()
     }
 
     pub fn set(&mut self, position: usize, value: u16) {

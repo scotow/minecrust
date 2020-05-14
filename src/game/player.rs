@@ -257,7 +257,7 @@ pub struct Info {
 }
 
 impl Info {
-    pub fn from_name(name: &String) -> Self {
+    pub fn from_name(name: &str) -> Self {
         let name = types::String::new(&name[..min(name.len(), 16)]);
         Self {
             uuid: offline_uuid(&name),

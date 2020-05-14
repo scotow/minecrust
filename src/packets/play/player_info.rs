@@ -37,7 +37,7 @@ impl<'a> Size for PlayerInfo<'a> {
 }
 
 #[async_trait::async_trait]
-impl<'a> Send for PlayerInfo<'a> {
+impl Send for PlayerInfo<'_> {
     async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         self.action.send(writer).await?;
         match self.action {

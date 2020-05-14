@@ -23,7 +23,7 @@ impl FromReader for VarInt {
         let mut bytes_read: i32 = 0;
         loop {
             let incoming_byte = reader.receive::<u8>().await?;
-            read_int |= ((incoming_byte & 0b0111_1111) as i32) << 7 * bytes_read;
+            read_int |= ((incoming_byte & 0b0111_1111) as i32) << (7 * bytes_read);
             bytes_read += 1;
             if incoming_byte >> 7 == 0 {
                 return Ok(Self::new(read_int));

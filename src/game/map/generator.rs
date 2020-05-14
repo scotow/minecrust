@@ -23,6 +23,12 @@ pub struct FlatChunkGenerator(SameChunkGenerator);
 
 impl FlatChunkGenerator {
     pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for FlatChunkGenerator {
+    fn default() -> Self {
         let mut original = Chunk::new(0, 0);
         for z in 0..16 {
             for x in 0..16 {

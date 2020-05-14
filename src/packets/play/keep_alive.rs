@@ -8,6 +8,12 @@ impl_packet!(KeepAlive, 0x21);
 
 impl KeepAlive {
     pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for KeepAlive {
+    fn default() -> Self {
         Self(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
