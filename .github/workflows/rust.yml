@@ -9,8 +9,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: Check lib
-      run: cargo check
+    - name: Build lib
+      run: cargo build
     - name: Check examples
       run: cargo check --examples
     - name: Run test
