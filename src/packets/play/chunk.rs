@@ -68,6 +68,9 @@ impl Chunk {
 
         // Set block in section.
         section.set(x, (y % 16) as u8, z, block);
+        if section.block_count == 0 {
+            self.sections[section_index] = None
+        }
 
         // Update heightmap if needed.
         if block != Block::Air {
