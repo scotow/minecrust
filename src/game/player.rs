@@ -37,6 +37,8 @@ pub struct Player {
 }
 
 impl Player {
+    const RENDER_DISTANCE: i32 = 16;
+
     pub async fn new(
         reader: impl TAsyncRead + 'static,
         writer: impl TAsyncWrite + 'static,
@@ -94,7 +96,7 @@ impl Player {
     }
 
     pub async fn run(&self) -> Result<()> {
-        self.send_chunks_around(4).await?;
+        self.send_chunks_around(Self::RENDER_DISTANCE).await?;
 
         let position = OutPlayerPositionLook::from(&*self.position.lock().await);
         position
@@ -138,7 +140,7 @@ impl Player {
                         self.send_packet(&out_view).await?;
                     }
 
-                    self.send_needed_chunks(4).await?;
+                    self.send_needed_chunks(Self::RENDER_DISTANCE).await?;
                 }
                 InPlayerPositionRotation::PACKET_ID => {
                     let in_position_rotation: InPlayerPositionRotation =
@@ -170,7 +172,7 @@ impl Player {
                         self.send_packet(&out_view).await?;
                     }
 
-                    self.send_needed_chunks(4).await?;
+                    self.send_needed_chunks(Self::RENDER_DISTANCE).await?;
                 }
                 InPlayerRotation::PACKET_ID => {
                     let in_rotation: InPlayerRotation = rest_reader.receive().await?;

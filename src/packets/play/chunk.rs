@@ -5,6 +5,7 @@ use anyhow::Result;
 use nbt::Blob;
 use std::fmt::{self, Debug};
 use std::ops::Add;
+use std::collections::{HashMap};
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -169,21 +170,26 @@ impl types::Send for Heightmap {
     }
 }
 
-#[derive(Debug, Clone, macro_derive::Size, macro_derive::Send)]
+#[derive(Debug, Clone)]
 struct ChunkSection {
     block_count: i16,
     bits_per_block: u8,
-    palette: Option<LengthVec<VarInt>>,
+    mapping: HashMap<Block, (u16, usize)>,
+    available: Vec<usize>,
+    palette: LengthVec<VarInt>,
     data: BitArray<LengthVec<u64>>,
 }
 
 impl ChunkSection {
     pub fn new() -> Self {
+        let bits_per_block: usize = 7;
         Self {
             block_count: 0,
-            bits_per_block: 14,
-            palette: None,
-            data: BitArray::<LengthVec<u64>>::new(16 * 16 * 16 * 14 / 64, 14),
+            bits_per_block: bits_per_block as u8,
+            mapping: HashMap::new(),
+            available: (0..(1 << bits_per_block)).collect(),
+            palette: LengthVec::from(vec![VarInt(0); 1 << bits_per_block]),
+            data: BitArray::<LengthVec<u64>>::new(16 * 16 * 16 * bits_per_block / 64, bits_per_block),
         }
     }
 
@@ -205,8 +211,35 @@ impl ChunkSection {
             self.block_count += 1;
         }
 
+        let palette_index = if self.mapping.contains_key(&new) {
+            let entry = self.mapping.get_mut(&new).unwrap();
+            *entry = (entry.0 + 1, entry.1);
+            entry.1
+        } else {
+            let palette_index = self.available.pop().unwrap();
+            self.mapping.insert(new, (0, palette_index));
+            self.palette[palette_index] = VarInt(new as i32);
+            palette_index
+        };
+
         self.data
-            .set(y as usize * 256 + z as usize * 16 + x as usize, new as u16);
+            .set(y as usize * 256 + z as usize * 16 + x as usize, palette_index as u16);
+    }
+}
+
+impl Size for ChunkSection {
+    fn size(&self) -> VarInt {
+        self.block_count.size() + self.bits_per_block.size() + self.palette.size() + self.data.size()
+    }
+}
+
+#[async_trait::async_trait]
+impl types::Send for ChunkSection {
+    async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
+        self.block_count.send(writer).await?;
+        self.bits_per_block.send(writer).await?;
+        self.palette.send(writer).await?;
+        self.data.send(writer).await
     }
 }
 
