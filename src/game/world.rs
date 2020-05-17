@@ -67,27 +67,30 @@ impl World {
         Ok(())
     }
 
+    /*
     pub async fn handle_connection_stream(
-        &self,
-        stream: (impl TAsyncRead + TAsyncWrite),
+        &'static self,
+        stream: (impl TAsyncRead + TAsyncWrite + 'static),
     ) -> Result<()> {
         let stream = Arc::new(stream);
-        let reader = futures::io::BufReader::new(stream.clone());
-        let writer = futures::io::BufWriter::new(stream.clone());
+        let reader = stream.clone();
+        let writer = stream.clone();
 
         self.handle_connection(reader, writer).await
     }
+    */
 
     pub async fn handle_connection(
-        &self,
-        reader: impl TAsyncRead,
-        writer: impl TAsyncWrite,
+        &'static self,
+        reader: impl TAsyncRead + 'static,
+        writer: impl TAsyncWrite + 'static,
     ) -> Result<()> {
         let player = Player::new(reader, writer, self.server_description, self).await?;
         if player.is_none() {
             return Ok(());
         }
-        self.add_player(player.unwrap()).await
+        self.add_player(player.unwrap()).await;
+        Ok(())
     }
 
     pub async fn add_player(&self, player: Player) {
