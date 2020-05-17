@@ -3,9 +3,9 @@ use crate::types::{self, BitArray, LengthVec, Size, TAsyncWrite, VarInt};
 use crate::{impl_send, impl_size};
 use anyhow::Result;
 use nbt::Blob;
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::ops::Add;
-use std::collections::{HashMap};
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -189,13 +189,17 @@ impl ChunkSection {
             mapping: HashMap::new(),
             available: (0..(1 << bits_per_block)).collect(),
             palette: LengthVec::from(vec![VarInt(0); 1 << bits_per_block]),
-            data: BitArray::<LengthVec<u64>>::new(16 * 16 * 16 * bits_per_block / 64, bits_per_block),
+            data: BitArray::<LengthVec<u64>>::new(
+                16 * 16 * 16 * bits_per_block / 64,
+                bits_per_block,
+            ),
         }
     }
 
     pub fn get(&self, x: u8, y: u8, z: u8) -> Block {
-        self.data
-            .get(y as usize * 256 + z as usize * 16 + x as usize)
+        (*self.palette[self
+            .data
+            .get(y as usize * 256 + z as usize * 16 + x as usize) as usize] as u16)
             .into()
     }
 
@@ -222,14 +226,19 @@ impl ChunkSection {
             palette_index
         };
 
-        self.data
-            .set(y as usize * 256 + z as usize * 16 + x as usize, palette_index as u16);
+        self.data.set(
+            y as usize * 256 + z as usize * 16 + x as usize,
+            palette_index as u16,
+        );
     }
 }
 
 impl Size for ChunkSection {
     fn size(&self) -> VarInt {
-        self.block_count.size() + self.bits_per_block.size() + self.palette.size() + self.data.size()
+        self.block_count.size()
+            + self.bits_per_block.size()
+            + self.palette.size()
+            + self.data.size()
     }
 }
 
