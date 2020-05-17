@@ -40,7 +40,7 @@ impl Player {
     pub async fn new(
         reader: impl TAsyncRead + 'static,
         writer: impl TAsyncWrite + 'static,
-        server_description: ServerDescription,
+        server_description: &ServerDescription,
         world: &'static World,
     ) -> Result<Option<Self>> {
         let mut reader: Box<dyn TAsyncRead> = Box::new(reader);

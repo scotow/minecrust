@@ -7,9 +7,9 @@ use crate::packets::play::join_game::JoinGame;
 use crate::packets::play::keep_alive::KeepAlive;
 use crate::packets::play::player_info::{Action, PlayerInfo};
 use crate::packets::play::spawn_player::SpawnPlayer;
-use crate::packets::Packet;
-use crate::types;
+use crate::packets::{Packet, ServerDescription};
 use crate::types::chat::Chat;
+use crate::types::{self, TAsyncRead, TAsyncWrite};
 use anyhow::Result;
 use futures_timer::Delay;
 use piper::{Arc, Lock};
@@ -18,13 +18,18 @@ use std::time::Duration;
 
 pub struct World {
     players: Lock<HashMap<types::VarInt, Arc<Player>>>,
+    server_description: &'static ServerDescription,
     pub map: Map,
 }
 
 impl World {
-    pub async fn new(generator: impl ChunkGenerator + Sync + std::marker::Send + 'static) -> Self {
+    pub async fn new(
+        server_description: &'static ServerDescription,
+        generator: impl ChunkGenerator + Sync + std::marker::Send + 'static,
+    ) -> Self {
         Self {
             players: Lock::new(HashMap::new()),
+            server_description,
             map: Map::new(generator).await,
         }
     }
@@ -60,6 +65,29 @@ impl World {
 
         futures::future::join_all(iter).await;
         Ok(())
+    }
+
+    pub async fn handle_connection_stream(
+        &self,
+        stream: (impl TAsyncRead + TAsyncWrite),
+    ) -> Result<()> {
+        let stream = Arc::new(stream);
+        let reader = futures::io::BufReader::new(stream.clone());
+        let writer = futures::io::BufWriter::new(stream.clone());
+
+        self.handle_connection(reader, writer).await
+    }
+
+    pub async fn handle_connection(
+        &self,
+        reader: impl TAsyncRead,
+        writer: impl TAsyncWrite,
+    ) -> Result<()> {
+        let player = Player::new(reader, writer, self.server_description, self).await?;
+        if player.is_none() {
+            return Ok(());
+        }
+        self.add_player(player.unwrap()).await
     }
 
     pub async fn add_player(&self, player: Player) {

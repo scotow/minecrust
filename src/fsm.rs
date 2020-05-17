@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::prelude::*;
 
 pub struct Fsm<'a> {
-    server_description: ServerDescription,
+    server_description: &'a ServerDescription,
     state: State,
     reader: &'a mut Box<dyn TAsyncRead>,
     writer: &'a mut Box<dyn TAsyncWrite>,
@@ -12,7 +12,7 @@ pub struct Fsm<'a> {
 
 impl<'a> Fsm<'a> {
     pub fn from_rw(
-        server_description: ServerDescription,
+        server_description: &'a ServerDescription,
         reader: &'a mut Box<dyn TAsyncRead>,
         writer: &'a mut Box<dyn TAsyncWrite>,
     ) -> Self {
