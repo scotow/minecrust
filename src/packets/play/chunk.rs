@@ -6,6 +6,7 @@ use nbt::Blob;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::ops::Add;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -243,25 +244,15 @@ impl ChunkSection {
     }
 
     fn decrement_palette(&mut self, block: Block) {
-        // let entry = self.mapping.get_mut(&block).expect("should never happen");
-        // if entry.0 >= 2 {
-        //     *entry = (entry.0 - 1, entry.1);
-        // } else {
-        //     self.mapping.remove(&block);
-        //     self.available.push(entry.1);
-        // }
-
-        let (count, index) = {
-            let entry = self.mapping.get(&block).expect("should never happen");
-            (entry.0, entry.1)
+        let mut entry = match self.mapping.entry(block) {
+            Occupied(entry) => entry,
+            Vacant(_) => unreachable!()
         };
 
-        if count >= 2 {
-            let entry = self.mapping.get_mut(&block).expect("should never happen");
-            *entry = (count - 1, index);
+        if entry.get().0 >= 2 {
+            entry.get_mut().0 -= 1;
         } else {
-            self.mapping.remove(&block);
-            self.available.push(index);
+            self.available.push(entry.remove().1);
         }
     }
 
