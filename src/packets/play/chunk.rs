@@ -3,10 +3,10 @@ use crate::types::{self, BitArray, LengthVec, Size, TAsyncWrite, VarInt};
 use crate::{impl_send, impl_size};
 use anyhow::Result;
 use nbt::Blob;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::ops::Add;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -182,9 +182,12 @@ struct ChunkSection {
 }
 
 impl ChunkSection {
-    const WIDTH: usize = 16;    // X
-    const LENGTH: usize = 16;   // Z
-    const HEIGHT: usize = 16;   // Y
+    const WIDTH: usize = 16;
+    // X
+    const LENGTH: usize = 16;
+    // Z
+    const HEIGHT: usize = 16;
+    // Y
     const CAPACITY: usize = Self::WIDTH * Self::LENGTH * Self::HEIGHT;
     const BASE_BITS_PER_BLOCK: usize = 4;
 
@@ -198,7 +201,10 @@ impl ChunkSection {
             bits_per_block: Self::BASE_BITS_PER_BLOCK as u8,
             mapping,
             available: (1..(1 << Self::BASE_BITS_PER_BLOCK)).rev().collect(),
-            palette: LengthVec::from(vec![VarInt(Block::Air as i32); 1 << Self::BASE_BITS_PER_BLOCK]),
+            palette: LengthVec::from(vec![
+                VarInt(Block::Air as i32);
+                1 << Self::BASE_BITS_PER_BLOCK
+            ]),
             data: BitArray::<LengthVec<u64>>::new(
                 Self::CAPACITY * Self::BASE_BITS_PER_BLOCK / 64,
                 Self::BASE_BITS_PER_BLOCK,
@@ -209,10 +215,8 @@ impl ChunkSection {
     pub fn get(&self, x: u8, y: u8, z: u8) -> Block {
         (*self.palette[self
             .data
-            .get(y as usize * Self::WIDTH * Self::LENGTH
-                + z as usize * Self::WIDTH
-                + x as usize
-            ) as usize] as u16)
+            .get(y as usize * Self::WIDTH * Self::LENGTH + z as usize * Self::WIDTH + x as usize)
+            as usize] as u16)
             .into()
     }
 
@@ -236,9 +240,7 @@ impl ChunkSection {
         };
 
         self.data.set(
-            y as usize * Self::WIDTH * Self::LENGTH
-                + z as usize * Self::WIDTH
-                + x as usize,
+            y as usize * Self::WIDTH * Self::LENGTH + z as usize * Self::WIDTH + x as usize,
             palette_index as u16,
         );
     }
@@ -246,13 +248,13 @@ impl ChunkSection {
     fn decrement_palette(&mut self, block: Block) {
         let mut entry = match self.mapping.entry(block) {
             Occupied(entry) => entry,
-            Vacant(_) => unreachable!()
+            Vacant(_) => unreachable!(),
         };
 
-        if entry.get().0 >= 2 {
-            entry.get_mut().0 -= 1;
-        } else {
+        if entry.get().0 == 1 {
             self.available.push(entry.remove().1);
+        } else {
+            entry.get_mut().0 -= 1;
         }
     }
 
@@ -266,11 +268,18 @@ impl ChunkSection {
 
             // We just scaled up to a direct palette.
             if self.bits_per_block == 14 {
-                return block as usize
+                return block as usize;
             }
 
             let palette_index = self.available.pop().unwrap();
             self.mapping.insert(block, (1, palette_index));
+
+            // Increase palette size if it's the first time that we reach that size.
+            if palette_index >= self.palette.len() {
+                self.palette.resize(palette_index + 1, VarInt(Block::Air as i32));
+            }
+
+            // Add block to the palette.
             self.palette[palette_index] = VarInt(block as i32);
             palette_index
         }
@@ -279,21 +288,22 @@ impl ChunkSection {
     fn scale_up_palette_if_needed(&mut self) {
         // Only scale if the palette is full.
         if !self.available.is_empty() {
-            return
+            return;
         }
 
         let new_bits_per_block = match self.bits_per_block {
             4..=7 => self.bits_per_block + 1,
             8 => 14,
-            _ => unreachable!()
+            _ => unreachable!(),
         } as usize;
 
         // Add some new available palette indexes only if we don't scale to a direct palette.
         if new_bits_per_block != 14 {
-            for i in (1 << self.bits_per_block as usize)..(1 << new_bits_per_block) {
-                self.available.push(i);
-                self.palette.push(VarInt(Block::Air as i32));
-            }
+            self.available.append(
+                &mut ((1 << self.bits_per_block as usize)..(1 << new_bits_per_block))
+                    .rev()
+                    .collect(),
+            );
         }
 
         // Rebuild the new data array.
@@ -312,9 +322,7 @@ impl ChunkSection {
 
 impl Size for ChunkSection {
     fn size(&self) -> VarInt {
-        let size = self.block_count.size()
-            + self.bits_per_block.size()
-            + self.data.size();
+        let size = self.block_count.size() + self.bits_per_block.size() + self.data.size();
 
         if self.bits_per_block == 14 {
             size
