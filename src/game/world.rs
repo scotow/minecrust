@@ -9,7 +9,7 @@ use crate::packets::play::player_info::{Action, PlayerInfo};
 use crate::packets::play::spawn_player::SpawnPlayer;
 use crate::packets::{Packet, ServerDescription};
 use crate::types::chat::Chat;
-use crate::types::{self, TAsyncRead, TAsyncWrite};
+use crate::types::{self, TAsyncRead, TAsyncStream, TAsyncWrite};
 use anyhow::Result;
 use futures_timer::Delay;
 use piper::{Arc, Lock};
@@ -67,18 +67,15 @@ impl World {
         Ok(())
     }
 
-    /*
-    pub async fn handle_connection_stream(
-        &'static self,
-        stream: (impl TAsyncRead + TAsyncWrite + 'static),
-    ) -> Result<()> {
-        let stream = Arc::new(stream);
-        let reader = stream.clone();
-        let writer = stream.clone();
+    pub async fn handle_connection_stream<S>(&'static self, stream: S) -> Result<()>
+    where
+        for<'a> &'a S: TAsyncRead + TAsyncWrite,
+        S: Sync + Send + 'static,
+    {
+        let (reader, writer) = TAsyncStream::split(stream);
 
         self.handle_connection(reader, writer).await
     }
-    */
 
     pub async fn handle_connection(
         &'static self,
