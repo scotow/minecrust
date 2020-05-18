@@ -12,10 +12,10 @@ use crate::packets::play::player_position::{
     InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition,
 };
 use crate::packets::play::{chat_message, player_position::OutPlayerPositionLook};
-use crate::packets::{Packet, ServerDescription};
+use crate::packets::{Packet};
 use crate::types::chat::Chat;
 use crate::types::{
-    self, BoolOption, EntityPosition, LengthVec, Receive, TAsyncRead, TAsyncWrite, VarInt,
+    self, BoolOption,ServerDescription, EntityPosition, LengthVec, Receive, TAsyncRead, TAsyncWrite, VarInt,
 };
 use anyhow::Result;
 use futures::prelude::*;

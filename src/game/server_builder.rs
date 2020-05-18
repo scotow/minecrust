@@ -1,6 +1,6 @@
 use super::map::generator::ChunkGenerator;
 use super::world::World;
-use crate::packets::{ServerDescription, Version};
+use crate::types::{ServerDescription, Version};
 use anyhow::Result;
 
 /// An helper function to easily create a server
