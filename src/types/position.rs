@@ -98,8 +98,8 @@ crate::impl_size!(BlockPosition, 8);
 #[async_trait::async_trait]
 impl Send for BlockPosition {
     async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
-        let n = ((self.x as u32 as u64 & 0x3FFFFFF) << 38)
-            | ((self.z as u32 as u64 & 0x3FFFFFF) << 12)
+        let n = ((self.x as u32 as u64 & 0x3FF_FFFF) << 38)
+            | ((self.z as u32 as u64 & 0x3FF_FFFF) << 12)
             | (self.y as u64 & 0xFFF);
         n.send(writer).await
     }

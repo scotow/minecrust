@@ -6,15 +6,15 @@ use futures::prelude::*;
 pub struct Fsm<'a> {
     server_description: &'a ServerDescription,
     state: State,
-    reader: &'a mut Box<dyn TAsyncRead>,
-    writer: &'a mut Box<dyn TAsyncWrite>,
+    reader: &'a mut dyn TAsyncRead,
+    writer: &'a mut dyn TAsyncWrite,
 }
 
 impl<'a> Fsm<'a> {
     pub fn from_rw(
         server_description: &'a ServerDescription,
-        reader: &'a mut Box<dyn TAsyncRead>,
-        writer: &'a mut Box<dyn TAsyncWrite>,
+        reader: &'a mut dyn TAsyncRead,
+        writer: &'a mut dyn TAsyncWrite,
     ) -> Self {
         Self {
             server_description,
@@ -24,7 +24,7 @@ impl<'a> Fsm<'a> {
         }
     }
 
-    pub async fn next(&mut self) -> Result<State> {
+    pub async fn next_state(&mut self) -> Result<State> {
         let state = self
             .state
             .clone()
@@ -35,7 +35,7 @@ impl<'a> Fsm<'a> {
 
     pub async fn play(mut self) -> Result<Option<LoginRequest>> {
         loop {
-            self.state = match self.next().await? {
+            self.state = match self.next_state().await? {
                 State::Finished(login) => return Ok(Some(login)),
                 State::StatusFinished => return Ok(None),
                 state @ State::Status => {
@@ -74,8 +74,8 @@ impl State {
     pub async fn next(
         self,
         server_description: &ServerDescription,
-        reader: &mut Box<dyn TAsyncRead>,
-        writer: &mut Box<dyn TAsyncWrite>,
+        mut reader: &mut dyn TAsyncRead,
+        mut writer: &mut dyn TAsyncWrite,
     ) -> Result<Self> {
         match self {
             State::Handshake => {
@@ -89,18 +89,20 @@ impl State {
             }
             State::Status => {
                 let status_request: StatusRequest = reader.receive().await?;
-                status_request.answer(writer, &server_description).await?;
+                status_request
+                    .answer(&mut writer, &server_description)
+                    .await?;
                 writer.flush().await?;
 
                 let ping: Ping = reader.receive().await?;
-                ping.send_packet(writer).await?;
+                ping.send_packet(&mut writer).await?;
                 writer.flush().await?;
 
                 Ok(State::StatusFinished)
             }
             State::Play => {
                 let login_start: LoginRequest = reader.receive().await?;
-                login_start.answer(writer).await?;
+                login_start.answer(&mut writer).await?;
                 writer.flush().await?;
                 Ok(State::Finished(login_start))
             }
