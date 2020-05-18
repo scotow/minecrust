@@ -13,3 +13,17 @@ pub mod player_position;
 pub mod recipes;
 pub mod slot;
 pub mod spawn_player;
+
+pub use block::*;
+pub use block_change::*;
+pub use chunk::*;
+pub use destroy_entity::*;
+pub use held_item_slot::*;
+pub use join_game::*;
+pub use keep_alive::*;
+pub use player_digging::*;
+pub use player_info::*;
+pub use player_position::*;
+pub use recipes::*;
+pub use slot::*;
+pub use spawn_player::*;

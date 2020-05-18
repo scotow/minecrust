@@ -1,5 +1,5 @@
 use crate::packets::{Handshake, LoginRequest, Packet, Ping, StatusRequest};
-use crate::types::{Receive, TAsyncRead, TAsyncWrite, ServerDescription};
+use crate::types::{Receive, ServerDescription, TAsyncRead, TAsyncWrite};
 use anyhow::Result;
 use futures::prelude::*;
 

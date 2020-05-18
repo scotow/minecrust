@@ -1,4 +1,4 @@
-use crate::packets::play::block::Block;
+use crate::packets::play::Block;
 use crate::types::{BlockPosition, VarInt};
 
 #[derive(Debug, macro_derive::Size, macro_derive::Send)]

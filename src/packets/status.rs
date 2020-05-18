@@ -1,6 +1,6 @@
 use super::Packet;
 use crate::impl_packet;
-use crate::types::{self, Receive, ServerDescription, Send, Size, TAsyncRead, TAsyncWrite};
+use crate::types::{self, Receive, Send, ServerDescription, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, ensure, Result};
 use serde_json::json;
 

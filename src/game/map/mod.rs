@@ -1,8 +1,7 @@
 pub mod generator;
 
 use crate::game::map::generator::ChunkGenerator;
-use crate::packets::play::block::Block;
-use crate::packets::play::chunk::Chunk;
+use crate::packets::play::{Block, Chunk};
 use piper::{Lock, LockGuard};
 use std::collections::HashMap;
 

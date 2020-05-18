@@ -1,5 +1,4 @@
-use crate::packets::play::block::Block;
-use crate::packets::play::chunk::Chunk;
+use crate::packets::play::{Block, Chunk};
 
 pub trait ChunkGenerator {
     fn chunk(&self, x: i32, z: i32) -> Chunk;

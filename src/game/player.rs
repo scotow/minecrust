@@ -1,21 +1,17 @@
 use crate::fsm::Fsm;
 use crate::game::world::World;
-use crate::packets::play::block::Block;
-use crate::packets::play::block_change::BlockChange;
-use crate::packets::play::chat_message::{InChatMessage, OutChatMessage};
-use crate::packets::play::entity_position::{
-    OutEntityHeadLook, OutPosition, OutPositionRotation, OutRotation,
+use crate::packets::play::{
+    chat_message::{self, InChatMessage, OutChatMessage},
+    entity_position::{OutEntityHeadLook, OutPosition, OutPositionRotation, OutRotation},
+    player_position::{
+        InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition,
+    },
+    Block, BlockChange, GameMode, OutPlayerPositionLook, PlayerDigging,
 };
-use crate::packets::play::join_game::GameMode;
-use crate::packets::play::player_digging::PlayerDigging;
-use crate::packets::play::player_position::{
-    InPlayerPosition, InPlayerPositionRotation, InPlayerRotation, OutViewPosition,
-};
-use crate::packets::play::{chat_message, player_position::OutPlayerPositionLook};
-use crate::packets::{Packet};
-use crate::types::chat::Chat;
+use crate::packets::Packet;
 use crate::types::{
-    self, BoolOption,ServerDescription, EntityPosition, LengthVec, Receive, TAsyncRead, TAsyncWrite, VarInt,
+    self, chat::Chat, BoolOption, EntityPosition, LengthVec, Receive, ServerDescription,
+    TAsyncRead, TAsyncWrite, VarInt,
 };
 use anyhow::Result;
 use futures::prelude::*;

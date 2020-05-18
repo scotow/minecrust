@@ -276,7 +276,8 @@ impl ChunkSection {
 
             // Increase palette size if it's the first time that we reach that size.
             if palette_index >= self.palette.len() {
-                self.palette.resize(palette_index + 1, VarInt(Block::Air as i32));
+                self.palette
+                    .resize(palette_index + 1, VarInt(Block::Air as i32));
             }
 
             // Add block to the palette.
