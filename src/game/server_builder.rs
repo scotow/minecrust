@@ -1,7 +1,8 @@
 use super::map::generator::ChunkGenerator;
 use super::world::World;
-use crate::types::{ServerDescription, Version};
+use crate::types::{ServerDescription, Version, Value};
 use anyhow::Result;
+use piper::Arc;
 
 /// An helper function to easily create a server
 #[derive(Clone)]
@@ -31,14 +32,47 @@ impl ServerBuilder {
         self
     }
 
-    /// Set the players of your server in place
-    pub fn set_players(&mut self, players: (u32, u32)) {
-        self.description.players = players;
+    /// Set the max players of your server in place
+    pub fn set_player_max(&mut self, player_max: u32) {
+        self.description.player_max = Value::Direct(player_max);
     }
 
-    /// Set the players of your server
-    pub fn with_players(mut self, players: (u32, u32)) -> Self {
-        self.set_players(players);
+    /// Set the max players of your server
+    pub fn with_player_max(mut self, player_max: u32) -> Self {
+        self.set_player_max(player_max);
+        self
+    }
+ 
+    /// Set the max players of your server in place from a function or closure
+    pub fn set_player_max_from_fn(&mut self, player_max: impl Fn(&World) -> u32 + 'static) {
+        self.description.player_max = Value::FromFn(Arc::new(Box::new(player_max)));
+    }
+
+    /// Set the max players of your server from a function or closure
+    pub fn with_player_max_from_fn(mut self, player_max: impl Fn(&World) -> u32 + 'static) -> Self{
+        self.set_player_max_from_fn(player_max);
+        self
+    }
+
+    /// Set the number of connected players of your server in place
+    pub fn set_player_connected(&mut self, player_connected: u32) {
+        self.description.player_connected = Value::Direct(player_connected);
+    }
+
+    /// Set the number of connected players of your server
+    pub fn with_player_connected(mut self, player_connected: u32) -> Self {
+        self.set_player_connected(player_connected);
+        self
+    }
+ 
+    /// Set the number of connected players of your server in place from a function or closure
+    pub fn set_player_connected_from_fn(&mut self, player_connected: impl Fn(&World) -> u32 + 'static) {
+        self.description.player_connected = Value::FromFn(Arc::new(Box::new(player_connected)));
+    }
+
+    /// Set the number of connected players of your server from a function or closure
+    pub fn with_player_connected_from_fn(mut self, player_connected: impl Fn(&World) -> u32 + 'static) -> Self{
+        self.set_player_connected_from_fn(player_connected);
         self
     }
 

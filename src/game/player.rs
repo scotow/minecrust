@@ -10,9 +10,7 @@ use crate::packets::play::{
 };
 use crate::packets::Packet;
 use crate::types::{
-    self, chat::Chat, BoolOption, EntityPosition, LengthVec, Receive, ServerDescription,
-    TAsyncRead, TAsyncWrite, VarInt,
-};
+    self, chat::Chat, BoolOption, EntityPosition, LengthVec, Receive, TAsyncRead, TAsyncWrite, VarInt};
 use anyhow::Result;
 use futures::prelude::*;
 use futures::AsyncWriteExt;
@@ -38,12 +36,11 @@ impl Player {
     pub async fn new(
         reader: impl TAsyncRead + 'static,
         writer: impl TAsyncWrite + 'static,
-        server_description: &ServerDescription,
         world: &'static World,
     ) -> Result<Option<Self>> {
         let mut reader: Box<dyn TAsyncRead> = Box::new(reader);
         let mut writer: Box<dyn TAsyncWrite> = Box::new(writer);
-        let fsm = Fsm::from_rw(server_description, &mut reader, &mut writer);
+        let fsm = Fsm::from_rw(world, &mut reader, &mut writer);
         let login = fsm.play().await?;
         if login.is_none() {
             return Ok(None);

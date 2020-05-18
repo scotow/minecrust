@@ -1,13 +1,14 @@
 use futures::prelude::*;
 use minecrust::game::map::generator::FlatChunkGenerator;
-use minecrust::game::ServerBuilder;
+use minecrust::game::{ServerBuilder, World};
 use smol::{Async, Task};
 use std::net::TcpListener;
 use std::time::Duration;
 
 fn main() -> ! {
     let world = ServerBuilder::new()
-        .with_players((1, 0))
+        .with_player_max(10)
+        .with_player_connected_from_fn(move |world: &World| async { world.players.lock().await.len()})
         .with_description("Rusty Minecraft Server".into())
         .with_icon_from_path("./examples/assets/server-icon.png")
         .unwrap()

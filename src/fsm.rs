@@ -1,10 +1,11 @@
 use crate::packets::{Handshake, LoginRequest, Packet, Ping, StatusRequest};
-use crate::types::{Receive, ServerDescription, TAsyncRead, TAsyncWrite};
+use crate::types::{Receive, TAsyncRead, TAsyncWrite};
+use crate::game::World;
 use anyhow::Result;
 use futures::prelude::*;
 
 pub struct Fsm<'a> {
-    server_description: &'a ServerDescription,
+    world: &'a World,
     state: State,
     reader: &'a mut dyn TAsyncRead,
     writer: &'a mut dyn TAsyncWrite,
@@ -12,12 +13,12 @@ pub struct Fsm<'a> {
 
 impl<'a> Fsm<'a> {
     pub fn from_rw(
-        server_description: &'a ServerDescription,
+        world: &'a World,
         reader: &'a mut dyn TAsyncRead,
         writer: &'a mut dyn TAsyncWrite,
     ) -> Self {
         Self {
-            server_description,
+            world,
             state: State::new(),
             reader,
             writer,
@@ -28,7 +29,7 @@ impl<'a> Fsm<'a> {
         let state = self
             .state
             .clone()
-            .next(&self.server_description, &mut self.reader, &mut self.writer)
+            .next(&self.world, &mut self.reader, &mut self.writer)
             .await?;
         Ok(state)
     }
@@ -41,7 +42,7 @@ impl<'a> Fsm<'a> {
                 state @ State::Status => {
                     // ignore what happens after a ping has been asked
                     let _ = state
-                        .next(&self.server_description, &mut self.reader, &mut self.writer)
+                        .next(&self.world, &mut self.reader, &mut self.writer)
                         .await;
                     return Ok(None);
                 }
@@ -73,7 +74,7 @@ impl State {
 
     pub async fn next(
         self,
-        server_description: &ServerDescription,
+        world: &World,
         mut reader: &mut dyn TAsyncRead,
         mut writer: &mut dyn TAsyncWrite,
     ) -> Result<Self> {
@@ -90,7 +91,7 @@ impl State {
             State::Status => {
                 let status_request: StatusRequest = reader.receive().await?;
                 status_request
-                    .answer(&mut writer, &server_description)
+                    .answer(&mut writer, world)
                     .await?;
                 writer.flush().await?;
 

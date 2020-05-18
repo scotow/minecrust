@@ -12,8 +12,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 pub struct World {
-    players: Lock<HashMap<types::VarInt, Arc<Player>>>,
-    server_description: ServerDescription,
+    pub players: Lock<HashMap<types::VarInt, Arc<Player>>>,
+    pub server_description: ServerDescription,
     pub map: Map,
 }
 
@@ -77,7 +77,7 @@ impl World {
         reader: impl TAsyncRead + 'static,
         writer: impl TAsyncWrite + 'static,
     ) -> Result<()> {
-        let player = Player::new(reader, writer, &self.server_description, self).await?;
+        let player = Player::new(reader, writer, self).await?;
         if player.is_none() {
             return Ok(());
         }

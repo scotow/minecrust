@@ -1,6 +1,7 @@
 use super::Packet;
+use crate::game::World;
 use crate::impl_packet;
-use crate::types::{self, Receive, Send, ServerDescription, Size, TAsyncRead, TAsyncWrite};
+use crate::types::{self, Receive, Send, Size, TAsyncRead, TAsyncWrite};
 use anyhow::{anyhow, ensure, Result};
 use serde_json::json;
 
@@ -12,14 +13,16 @@ impl StatusRequest {
     pub async fn answer<W: TAsyncWrite>(
         &self,
         writer: &mut W,
-        description: &ServerDescription,
+        world: &World,
     ) -> Result<()> {
+        let description = &world.server_description;
+
         let info = types::String::new(
             &json!({
                 "version": description.version,
                 "players": {
-                    "online": description.players.0,
-                    "max": description.players.1,
+                    "online": description.player_connected(world),
+                    "max": description.player_max(world),
                     "sample": []
                 },
                 "description": {
