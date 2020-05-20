@@ -186,7 +186,7 @@ impl Player {
                 }
                 PlayerDigging::PACKET_ID => {
                     let action: PlayerDigging = rest_reader.receive().await?;
-                    if let PlayerDigging::FinishedDigging(position, _face) = dbg!(action) {
+                    if let PlayerDigging::FinishedDigging(position, _face) = action {
                         let block_change = BlockChange::new(position.clone(), Block::Air);
                         self.world
                             .broadcast_packet_except(&block_change, &self)
