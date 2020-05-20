@@ -312,8 +312,15 @@ impl ChunkSection {
             Self::CAPACITY * new_bits_per_block / 64,
             new_bits_per_block,
         );
-        for i in 0..Self::CAPACITY {
-            new_data.set(i, self.data.get(i));
+
+        if new_bits_per_block == 14 {
+            for i in 0..Self::CAPACITY {
+                new_data.set(i, *self.palette[self.data.get(i) as usize] as u16);
+            }
+        } else {
+            for i in 0..Self::CAPACITY {
+                new_data.set(i, self.data.get(i));
+            }
         }
 
         self.bits_per_block = new_bits_per_block as u8;
