@@ -213,11 +213,15 @@ impl ChunkSection {
     }
 
     pub fn get(&self, x: u8, y: u8, z: u8) -> Block {
-        (*self.palette[self
+        let palette_index = self
             .data
-            .get(y as usize * Self::WIDTH * Self::LENGTH + z as usize * Self::WIDTH + x as usize)
-            as usize] as u16)
-            .into()
+            .get(y as usize * Self::WIDTH * Self::LENGTH + z as usize * Self::WIDTH + x as usize);
+
+        if self.bits_per_block == 14 {
+            palette_index.into()
+        } else {
+            (*self.palette[palette_index as usize] as u16).into()
+        }
     }
 
     pub fn set(&mut self, x: u8, y: u8, z: u8, new: Block) {
