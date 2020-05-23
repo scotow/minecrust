@@ -182,32 +182,32 @@ struct ChunkSection {
 }
 
 impl ChunkSection {
-    const WIDTH: usize = 16;
-    // X
-    const LENGTH: usize = 16;
-    // Z
-    const HEIGHT: usize = 16;
-    // Y
+    const WIDTH: usize = 16; // X
+    const LENGTH: usize = 16; // Z
+    const HEIGHT: usize = 16; // Y
     const CAPACITY: usize = Self::WIDTH * Self::LENGTH * Self::HEIGHT;
-    const BASE_BITS_PER_BLOCK: usize = 4;
+
+    const INDIRECT_MIN_BITS_PER_BLOCK: u8 = 4;
+    const INDIRECT_MAX_BITS_PER_BLOCK: u8 = 8;
+    const DIRECT_BITS_PER_BLOCK: u8 = 14;
+    const DOWNSCALE_MARGIN: usize = 4;
 
     pub fn new() -> Self {
-        let mut mapping = HashMap::new();
+        let mut mapping = HashMap::with_capacity(1);
         mapping.insert(Block::Air, (Self::CAPACITY as u16, 0));
 
         // Remove first index from 'available' for Block::Air.
         Self {
             block_count: 0,
-            bits_per_block: Self::BASE_BITS_PER_BLOCK as u8,
+            bits_per_block: Self::INDIRECT_MIN_BITS_PER_BLOCK,
             mapping,
-            available: (1..(1 << Self::BASE_BITS_PER_BLOCK)).rev().collect(),
-            palette: LengthVec::from(vec![
-                VarInt(Block::Air as i32);
-                1 << Self::BASE_BITS_PER_BLOCK
-            ]),
+            available: (1..(1 << Self::INDIRECT_MIN_BITS_PER_BLOCK as usize))
+                .rev()
+                .collect(),
+            palette: LengthVec::from(vec![VarInt(Block::Air as i32)]),
             data: BitArray::<LengthVec<u64>>::new(
-                Self::CAPACITY * Self::BASE_BITS_PER_BLOCK / 64,
-                Self::BASE_BITS_PER_BLOCK,
+                Self::CAPACITY * Self::INDIRECT_MIN_BITS_PER_BLOCK as usize / 64,
+                Self::INDIRECT_MIN_BITS_PER_BLOCK as usize,
             ),
         }
     }
@@ -217,7 +217,7 @@ impl ChunkSection {
             .data
             .get(y as usize * Self::WIDTH * Self::LENGTH + z as usize * Self::WIDTH + x as usize);
 
-        if self.bits_per_block == 14 {
+        if self.bits_per_block == Self::DIRECT_BITS_PER_BLOCK {
             palette_index.into()
         } else {
             (*self.palette[palette_index as usize] as u16).into()
@@ -236,17 +236,15 @@ impl ChunkSection {
             self.block_count += 1;
         }
 
-        let palette_index = if self.bits_per_block == 14 {
-            new as u16
-        } else {
-            self.decrement_palette(old);
-            self.increment_palette(new) as u16
-        };
+        self.decrement_palette(old);
 
+        let palette_index = self.increment_palette(new);
         self.data.set(
             y as usize * Self::WIDTH * Self::LENGTH + z as usize * Self::WIDTH + x as usize,
             palette_index as u16,
         );
+
+        self.scale_down_palette_if_needed();
     }
 
     fn decrement_palette(&mut self, block: Block) {
@@ -264,14 +262,15 @@ impl ChunkSection {
 
     fn increment_palette(&mut self, block: Block) -> usize {
         if self.mapping.contains_key(&block) {
-            let entry = self.mapping.get_mut(&block).unwrap();
-            *entry = (entry.0 + 1, entry.1);
-            entry.1
+            let (count, index) = self.mapping.get_mut(&block).unwrap();
+            *count += 1;
+            *index
         } else {
             self.scale_up_palette_if_needed();
 
-            // We just scaled up to a direct palette.
-            if self.bits_per_block == 14 {
+            // We are on a direct palette. Add block count and return its direct value.
+            if self.bits_per_block == Self::DIRECT_BITS_PER_BLOCK {
+                self.mapping.insert(block, (1, 0));
                 return block as usize;
             }
 
@@ -292,20 +291,24 @@ impl ChunkSection {
 
     fn scale_up_palette_if_needed(&mut self) {
         // Only scale if the palette is full.
-        if !self.available.is_empty() {
+        if self.bits_per_block == Self::DIRECT_BITS_PER_BLOCK || !self.available.is_empty() {
             return;
         }
 
         let new_bits_per_block = match self.bits_per_block {
-            4..=7 => self.bits_per_block + 1,
-            8 => 14,
+            bpb @ Self::INDIRECT_MIN_BITS_PER_BLOCK..=Self::INDIRECT_MAX_BITS_PER_BLOCK
+                if bpb < Self::INDIRECT_MAX_BITS_PER_BLOCK =>
+            {
+                self.bits_per_block + 1
+            }
+            Self::INDIRECT_MAX_BITS_PER_BLOCK => Self::DIRECT_BITS_PER_BLOCK,
             _ => unreachable!(),
-        } as usize;
+        };
 
         // Add some new available palette indexes only if we don't scale to a direct palette.
-        if new_bits_per_block != 14 {
+        if new_bits_per_block != Self::DIRECT_BITS_PER_BLOCK {
             self.available.append(
-                &mut ((1 << self.bits_per_block as usize)..(1 << new_bits_per_block))
+                &mut ((1 << self.bits_per_block as usize)..(1 << new_bits_per_block as usize))
                     .rev()
                     .collect(),
             );
@@ -313,13 +316,60 @@ impl ChunkSection {
 
         // Rebuild the new data array.
         let mut new_data = BitArray::<LengthVec<u64>>::new(
-            Self::CAPACITY * new_bits_per_block / 64,
-            new_bits_per_block,
+            Self::CAPACITY * new_bits_per_block as usize / 64,
+            new_bits_per_block as usize,
         );
 
-        if new_bits_per_block == 14 {
+        if new_bits_per_block == Self::DIRECT_BITS_PER_BLOCK {
             for i in 0..Self::CAPACITY {
                 new_data.set(i, *self.palette[self.data.get(i) as usize] as u16);
+            }
+        } else {
+            for i in 0..Self::CAPACITY {
+                new_data.set(i, self.data.get(i));
+            }
+        }
+
+        self.bits_per_block = new_bits_per_block;
+        self.data = new_data;
+    }
+
+    fn scale_down_palette_if_needed(&mut self) {
+        #[allow(overlapping_patterns)]
+        let new_bits_per_block = match self.bits_per_block {
+            Self::INDIRECT_MIN_BITS_PER_BLOCK => return,
+            bpb @ Self::INDIRECT_MIN_BITS_PER_BLOCK..=Self::INDIRECT_MAX_BITS_PER_BLOCK
+                if bpb > Self::INDIRECT_MIN_BITS_PER_BLOCK =>
+            {
+                self.bits_per_block - 1
+            }
+            Self::DIRECT_BITS_PER_BLOCK => Self::INDIRECT_MAX_BITS_PER_BLOCK,
+            _ => unreachable!(),
+        };
+
+        if self.mapping.len() > (1 << new_bits_per_block as usize) - Self::DOWNSCALE_MARGIN {
+            return;
+        }
+
+        // Rebuilding palette and available indexes list.
+        self.palette = LengthVec::from(Vec::with_capacity(self.mapping.len()));
+        self.available = (self.mapping.len()..(1 << new_bits_per_block))
+            .rev()
+            .collect();
+
+        for (new_index, (block, (_count, palette_index))) in self.mapping.iter_mut().enumerate() {
+            *palette_index = new_index;
+            self.palette.push(VarInt(*block as i32));
+        }
+
+        let mut new_data = BitArray::<LengthVec<u64>>::new(
+            Self::CAPACITY * new_bits_per_block as usize / 64,
+            new_bits_per_block as usize,
+        );
+
+        if self.bits_per_block == Self::DIRECT_BITS_PER_BLOCK {
+            for i in 0..Self::CAPACITY {
+                new_data.set(i, self.mapping[&self.data.get(i).into()].1 as u16);
             }
         } else {
             for i in 0..Self::CAPACITY {
@@ -336,7 +386,7 @@ impl Size for ChunkSection {
     fn size(&self) -> VarInt {
         let size = self.block_count.size() + self.bits_per_block.size() + self.data.size();
 
-        if self.bits_per_block == 14 {
+        if self.bits_per_block == Self::DIRECT_BITS_PER_BLOCK {
             size
         } else {
             size + self.palette.size()
@@ -349,7 +399,7 @@ impl types::Send for ChunkSection {
     async fn send<W: TAsyncWrite>(&self, writer: &mut W) -> Result<()> {
         self.block_count.send(writer).await?;
         self.bits_per_block.send(writer).await?;
-        if self.bits_per_block != 14 {
+        if self.bits_per_block != Self::DIRECT_BITS_PER_BLOCK {
             self.palette.send(writer).await?;
         }
         self.data.send(writer).await
