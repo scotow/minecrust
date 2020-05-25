@@ -351,15 +351,16 @@ impl ChunkSection {
             return;
         }
 
-        // Rebuilding palette and available indexes list.
-        self.palette = LengthVec::from(Vec::with_capacity(self.mapping.len()));
+        // Rebuilding the available indexes list.
         self.available = (self.mapping.len()..(1 << new_bits_per_block))
             .rev()
             .collect();
 
+        // Rebuild palette indexes and replace them in the map.
+        let mut new_palette = LengthVec::from(Vec::with_capacity(self.mapping.len()));
         for (new_index, (block, (_count, palette_index))) in self.mapping.iter_mut().enumerate() {
             *palette_index = new_index;
-            self.palette.push(VarInt(*block as i32));
+            new_palette.push(VarInt(*block as i32));
         }
 
         let mut new_data = BitArray::<LengthVec<u64>>::new(
@@ -373,11 +374,16 @@ impl ChunkSection {
             }
         } else {
             for i in 0..Self::CAPACITY {
-                new_data.set(i, self.data.get(i));
+                new_data.set(
+                    i,
+                    self.mapping[&(*self.palette[self.data.get(i) as usize] as u16).into()].1
+                        as u16,
+                );
             }
         }
 
         self.bits_per_block = new_bits_per_block as u8;
+        self.palette = new_palette;
         self.data = new_data;
     }
 }
@@ -583,6 +589,136 @@ mod tests {
                     assert_eq!(section.get(x, y, z), Block::HoneyBlock);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_palette() {
+        // Test initial bits per size.
+        let section = ChunkSection::new();
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK
+        );
+
+        // Shouldn't scale up, we are on the limit.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            1 << ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK as u16,
+        );
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK
+        );
+
+        // Should scale up, we are on the limit + 1.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            (1 << ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK as u16) + 1,
+        );
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK + 1
+        );
+        check_first_blocks(&mut section, 0, 17);
+
+        // Shouldn't scale down, we just removed 2 blocks (less than margin).
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            (1 << ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK as u16) + 1,
+        );
+        clean_first_blocks(&mut section, 2);
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK + 1
+        );
+
+        // Shouldn't scale down, we are just above the downscale limit.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            (1 << ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK as u16) + 1,
+        );
+        clean_first_blocks(&mut section, ChunkSection::DOWNSCALE_MARGIN as u16);
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK + 1
+        );
+
+        // Should scale down, we removed as much as the margin + 1.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            (1 << ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK as u16) + 1,
+        );
+        clean_first_blocks(&mut section, ChunkSection::DOWNSCALE_MARGIN as u16 + 1);
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MIN_BITS_PER_BLOCK
+        );
+        check_first_blocks(&mut section, ChunkSection::DOWNSCALE_MARGIN as u16 + 2, 10);
+
+        // Should scale up to max indirect size, we are on the direct limit - 1.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            1 << ChunkSection::INDIRECT_MAX_BITS_PER_BLOCK as u16,
+        );
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MAX_BITS_PER_BLOCK
+        );
+        check_first_blocks(&mut section, 0, 100);
+
+        // Should scale up to a direct palette.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            1 << (ChunkSection::INDIRECT_MAX_BITS_PER_BLOCK as u16) + 1,
+        );
+        assert_eq!(section.bits_per_block, ChunkSection::DIRECT_BITS_PER_BLOCK);
+        check_first_blocks(&mut section, 0, 100);
+
+        // Should scale up to a direct palette then downscale to a max size indirect palette.
+        let mut section = ChunkSection::new();
+        set_first_blocks(
+            &mut section,
+            (1 << ChunkSection::INDIRECT_MAX_BITS_PER_BLOCK as u16) + 1,
+        );
+        clean_first_blocks(&mut section, ChunkSection::DOWNSCALE_MARGIN as u16 + 1);
+        assert_eq!(
+            section.bits_per_block,
+            ChunkSection::INDIRECT_MAX_BITS_PER_BLOCK
+        );
+        check_first_blocks(&mut section, ChunkSection::DOWNSCALE_MARGIN as u16 + 2, 100);
+    }
+
+    fn set_first_blocks(section: &mut ChunkSection, n: u16) {
+        for i in 0..n {
+            section.set(
+                (i % 16) as u8,
+                (i / 256) as u8,
+                (i / 16) as u8,
+                Block::from(i),
+            );
+        }
+    }
+
+    fn clean_first_blocks(section: &mut ChunkSection, n: u16) {
+        for i in 1..(n + 1) {
+            section.set((i % 16) as u8, (i / 256) as u8, (i / 16) as u8, Block::Air);
+        }
+    }
+
+    fn check_first_blocks(section: &mut ChunkSection, start: u16, n: u16) {
+        for i in (start)..(start + n) {
+            assert_eq!(
+                section.get((i % 16) as u8, (i / 256) as u8, (i / 16) as u8),
+                Block::from(i)
+            );
         }
     }
 }
